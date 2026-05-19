@@ -346,6 +346,18 @@ def main() -> int:
     parser.add_argument("--pll-freq", type=float, default=33.333e6)
     parser.add_argument("--adc-mul", type=int, default=1)
     parser.add_argument("--threshold", type=float, default=4.5)
+    parser.add_argument(
+        "--trace-order",
+        choices=["paired", "shuffle"],
+        default="paired",
+        help="paired: fixed then random per iteration; shuffle: balanced randomized fixed/random order.",
+    )
+    parser.add_argument(
+        "--order-seed",
+        type=lambda x: int(x, 0),
+        default=0x5EED,
+        help="Seed for --trace-order shuffle; ignored by paired order.",
+    )
     parser.add_argument("--out", type=Path, default=Path("reports/tvla/phoenix_tvla.npz"))
     parser.add_argument("--no-force", action="store_true")
     args = parser.parse_args()
@@ -409,15 +421,28 @@ def main() -> int:
         print(
             f"[TVLA] operation={args.operation} instr=0x{INSTR[args.operation]:03x} "
             f"traces/group={args.traces} slots={slots} words/slot={args.words_per_slot} "
-            f"samples={args.samples} secret-dist={secret_dist}"
+            f"samples={args.samples} secret-dist={secret_dist} trace-order={args.trace_order}"
         )
+        if args.trace_order == "paired":
+            capture_plan = [fixed for _ in range(args.traces) for fixed in (True, False)]
+            interleave_description = "per-iteration fixed then random"
+        else:
+            capture_plan = [True] * args.traces + [False] * args.traces
+            order_rng = random.Random(args.order_seed)
+            order_rng.shuffle(capture_plan)
+            interleave_description = f"balanced shuffled fixed/random order seed=0x{args.order_seed:X}"
+
+        total_captures = len(capture_plan)
+        progress_interval = max(1, total_captures // 10)
+        fixed_seen = 0
+        random_seen = 0
         t0 = time.monotonic()
-        for i in range(args.traces):
+        for capture_idx, is_fixed in enumerate(capture_plan, start=1):
             load_group(
                 dut,
                 slots,
                 args.words_per_slot,
-                fixed=True,
+                fixed=is_fixed,
                 operation=args.operation,
                 fixed_mode=args.fixed_mode,
                 fixed_value=args.fixed_value,
@@ -427,28 +452,20 @@ def main() -> int:
                 mldsa_eta=args.mldsa_eta,
             )
             trace, status = capture_operation(scope, dut, INSTR[args.operation], timeout_s=5.0)
-            fixed_traces.append(trace)
-            fixed_cycles.append(status.field1)
+            if is_fixed:
+                fixed_traces.append(trace)
+                fixed_cycles.append(status.field1)
+                fixed_seen += 1
+            else:
+                random_traces.append(trace)
+                random_cycles.append(status.field1)
+                random_seen += 1
 
-            load_group(
-                dut,
-                slots,
-                args.words_per_slot,
-                fixed=False,
-                operation=args.operation,
-                fixed_mode=args.fixed_mode,
-                fixed_value=args.fixed_value,
-                fixed_map=fixed_map,
-                secret_dist=secret_dist,
-                mlkem_eta=args.mlkem_eta,
-                mldsa_eta=args.mldsa_eta,
-            )
-            trace, status = capture_operation(scope, dut, INSTR[args.operation], timeout_s=5.0)
-            random_traces.append(trace)
-            random_cycles.append(status.field1)
-
-            if (i + 1) % max(1, min(10, args.traces)) == 0:
-                print(f"[TVLA] captured {i + 1}/{args.traces} pairs")
+            if capture_idx % progress_interval == 0 or capture_idx == total_captures:
+                print(
+                    f"[TVLA] captured {capture_idx}/{total_captures} traces "
+                    f"(fixed={fixed_seen}/{args.traces} random={random_seen}/{args.traces})"
+                )
 
         fixed_arr = np.vstack(fixed_traces)
         random_arr = np.vstack(random_traces)
@@ -510,6 +527,8 @@ def main() -> int:
                 "adc_mul": args.adc_mul,
                 "trigger": "tio4",
                 "adc_mode": "direct_extclk" if args.adc_mul == 1 else "extclk_pll",
+                "trace_order": args.trace_order,
+                "order_seed": args.order_seed if args.trace_order == "shuffle" else None,
             },
             "hardware": {
                 "target": "CW305 Artix-7",
@@ -543,7 +562,7 @@ def main() -> int:
                     "memory-down banks. NTT/INTT load slots 0..3; PWM loads slots "
                     "0..7 so both multiplier operands are controlled by the TVLA class."
                 ),
-                "interleave": "per-iteration fixed then random",
+                "interleave": interleave_description,
                 "limitation": (
                     "NO_THRESHOLD_CROSSING means no 1st-order leakage detected for this fixed seed "
                     "at this trace count; it is not a proof of absence."
@@ -588,6 +607,8 @@ def main() -> int:
             secret_dist_arg=args.secret_dist,
             mlkem_eta=args.mlkem_eta,
             mldsa_eta=args.mldsa_eta,
+            trace_order=args.trace_order,
+            order_seed=(args.order_seed if args.trace_order == "shuffle" else -1),
             metadata_json=metadata_json,
         )
         meta_path = write_metadata(args.out, metadata)
