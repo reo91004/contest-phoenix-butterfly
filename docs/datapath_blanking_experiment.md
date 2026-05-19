@@ -842,3 +842,196 @@ Decision after methodology check:
 - Do not claim first-order TVLA success. The next useful experiments should
   separate active arithmetic leakage from blanking/placement side effects,
   rather than adding more invalid-cycle PRD globally.
+
+## Peak-Location Check
+
+Status: analyzed from existing NPZ/summary files.
+
+Purpose:
+
+- Determine whether the large TVLA peaks move with blanking policy or stay tied
+  to stable active-cycle locations.
+- A stable peak index across baseline/blanking variants suggests active
+  arithmetic leakage, not invalid-cycle residue.
+
+Selected peak locations:
+
+| Operation | Baseline peak | Stage 2 peak | Stage 3d shuffled peak | Notes |
+|---|---:|---:|---:|---|
+| `mlkem_ntt` | 219 | 116 | 217 | Blanking policy moves the dominant peak. |
+| `mlkem_intt` | 250 | 188 | 182 | Stage 2/3d peaks are in the same region. |
+| `mlkem_pwm` | 63 | 63 | 63 | Stable across all measured variants. |
+| `mldsa_ntt` | 63 | 425 | 327 | PRD changes both magnitude and location. |
+| `mldsa_intt` | 213 | 412 | 123 | Sensitive to blanking/placement. |
+| `mldsa_pwm` | 115 | 115 | 134 | PRD changes the dominant peak cluster. |
+
+PWM top-peak details:
+
+- `mlkem_pwm` baseline top peaks: 63:114.7, 62:90.7, 64:85.3.
+- `mlkem_pwm` Stage 3d shuffled top peaks: 63:114.9, 62:84.6, 64:80.9.
+- `mldsa_pwm` baseline top peaks: 115:144.1, 106:116.1, 114:102.9.
+- `mldsa_pwm` Stage 3d shuffled top peaks: 134:-71.9, 114:68.4,
+  106:68.1, 115:68.0.
+
+Interpretation:
+
+- `mlkem_pwm` is dominated by the same active-cycle window at sample/cycle index
+  63 regardless of blanking policy. This explains why invalid-cycle PRD does
+  not materially improve ML-KEM PWM.
+- `mldsa_pwm` is different: PRD invalid flushing changes both the dominant peak
+  and its magnitude. This supports the idea that residual or idle pipeline state
+  contributes to the ML-DSA PWM measurement.
+
+## Stage 3e Log: No-PRD Control
+
+Status: measured control, not an accepted countermeasure.
+
+Strategy:
+
+- Keep the Stage 3d code shape but set `USE_PRD_INVALID_BLANKING = 1'b0`.
+- This disables PRD invalid-cycle flushing and returns the SBU to zero blanking
+  for invalid cycles.
+- Purpose: verify whether the Stage 3d ML-DSA benefit really comes from PRD
+  invalid flushing, or whether it could be a placement/build artifact.
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.087 ns, TNS = 0.000 ns, WHS = 0.078 ns,
+  THS = 0.000 ns.
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_stage3d_shuffle.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3e_no_prd_shuffle_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs Stage 3d shuffled:
+
+| Operation | Stage 3d shuffled max abs t | Stage 3e max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 99.210 | 105.942 | +6.732 | +6.79% |
+| `mlkem_intt` | 44.315 | 35.023 | -9.292 | -20.97% |
+| `mlkem_pwm` | 114.901 | 114.851 | -0.050 | -0.04% |
+| `mldsa_ntt` | 94.490 | 146.369 | +51.880 | +54.91% |
+| `mldsa_intt` | 127.071 | 125.538 | -1.533 | -1.21% |
+| `mldsa_pwm` | 71.935 | 141.801 | +69.865 | +97.12% |
+
+Stage 3e interpretation:
+
+- Disabling PRD almost completely removes the Stage 3d ML-DSA PWM improvement:
+  71.935 becomes 141.801.
+- ML-DSA NTT also regresses strongly: 94.490 becomes 146.369.
+- Therefore the Stage 3d ML-DSA NTT/PWM reduction is not just a shuffled-order
+  artifact or a generic placement artifact. It depends on the PRD invalid-cycle
+  flush being enabled.
+- ML-KEM PWM stays around the same active peak at index 63. Again, this supports
+  the conclusion that ML-KEM PWM needs a different countermeasure than
+  invalid-cycle blanking.
+
+## Stage 3f Log: Targeted ML-DSA NTT/PWM PRD
+
+Status: measured tradeoff candidate, not accepted as the balanced final patch.
+
+Strategy:
+
+- Enable PRD invalid-cycle flushing only when `sel_i` is `SBU_MLDSA_NTT` or
+  `SBU_MLDSA_PWM`.
+- Leave ML-KEM and ML-DSA INTT invalid cycles on zero blanking.
+- Rationale: Stage 3e showed PRD is necessary for ML-DSA NTT/PWM, while ML-DSA
+  INTT did not clearly benefit from PRD in Stage 3d.
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.206 ns, TNS = 0.000 ns, WHS = 0.090 ns,
+  THS = 0.000 ns. This is the healthiest timing margin among Stage 3d/3e/3f.
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_stage3d_shuffle.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_stage3e_shuffle.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_shuffle_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs Stage 3d shuffled:
+
+| Operation | Stage 3d shuffled max abs t | Stage 3f max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 99.210 | 97.873 | -1.337 | -1.35% |
+| `mlkem_intt` | 44.315 | 69.397 | +25.082 | +56.60% |
+| `mlkem_pwm` | 114.901 | 113.071 | -1.830 | -1.59% |
+| `mldsa_ntt` | 94.490 | 84.613 | -9.877 | -10.45% |
+| `mldsa_intt` | 127.071 | 147.020 | +19.949 | +15.70% |
+| `mldsa_pwm` | 71.935 | 69.409 | -2.526 | -3.51% |
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3f max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 97.873 | +12.972 | +15.28% |
+| `mlkem_intt` | 65.052 | 69.397 | +4.345 | +6.68% |
+| `mlkem_pwm` | 114.713 | 113.071 | -1.642 | -1.43% |
+| `mldsa_ntt` | 132.180 | 84.613 | -47.567 | -35.99% |
+| `mldsa_intt` | 135.012 | 147.020 | +12.008 | +8.89% |
+| `mldsa_pwm` | 144.055 | 69.409 | -74.646 | -51.82% |
+
+INTT repeat:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3f_targeted_prd_intt_repeat_20260520_cw305_husky_1000 \
+OPS='mlkem_intt mldsa_intt' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0xA11CE \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Repeat results:
+
+| Operation | Stage 3f full max abs t | Stage 3f repeat max abs t | Repeat peak |
+|---|---:|---:|---:|
+| `mlkem_intt` | 69.397 | 71.813 | 209 |
+| `mldsa_intt` | 147.020 | 151.225 | 412 |
+
+Stage 3f interpretation:
+
+- Stage 3f is excellent for the exact operations it targets: `mldsa_ntt` and
+  `mldsa_pwm` are the lowest measured so far.
+- The improvement is not free. Both INTT measurements regress, and the repeat
+  confirms that the INTT regression is reproducible on this bitstream.
+- The most plausible cause is physical/selector-policy interaction rather than
+  a functional bug: functional regression and bank diagnostics pass, cycle
+  counts are unchanged, and the peaks are stable. Narrowing PRD changes the
+  synthesized cone and placement enough to hurt the INTT active/leakage windows.
+- As a single all-operation bitstream, Stage 3d is still more balanced. Stage 3f
+  is useful evidence that operation-specific PRD can optimize NTT/PWM, but it
+  should not replace Stage 3d without an additional INTT-specific mitigation.
