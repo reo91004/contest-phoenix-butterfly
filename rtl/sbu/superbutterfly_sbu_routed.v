@@ -143,6 +143,7 @@ module superbutterfly_sbu_routed (
         case (sel6)
             `SBU_NTT_CT,
             `SBU_MLDSA_NTT : begin c4a=a6;                 c4b=p6;                  end
+            `SBU_INTT_GS   : begin c4a=a6;                 c4b=p6;                  end
             `SBU_PWM1    : begin c4a={16'b0,p6[15:0]};   c4b={16'b0,comp1_y[15:0]}; end
             default      : begin c4a=32'b0;              c4b=32'b0;               end
         endcase
