@@ -40,11 +40,12 @@ module superbutterfly_sbu_routed (
     wire [31:0] blank_a = blank_lfsr;
     wire [31:0] blank_b = {blank_lfsr[15:0], blank_lfsr[31:16]} ^ 32'hA5A55A5A;
     wire [31:0] blank_c = {blank_lfsr[7:0], blank_lfsr[31:8]} ^ 32'h3C6EF372;
+    wire use_prd_blank = USE_PRD_INVALID_BLANKING && !valid_i && `SBU_OPMODE(sel_i);
 
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             blank_lfsr <= 32'h6D2B79F5;
-        end else begin
+        end else if (use_prd_blank) begin
             blank_lfsr <= blank_lfsr_next;
         end
     end
@@ -54,7 +55,7 @@ module superbutterfly_sbu_routed (
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin sel1<=9'b0;a1<=0;b1<=0;c1<=0;v1<=1'b0; end
         else if (valid_i) begin sel1<=sel_i;a1<=a_i;b1<=b_i;c1<=c_i;v1<=1'b1; end
-        else if (USE_PRD_INVALID_BLANKING && `SBU_OPMODE(sel_i)) begin
+        else if (use_prd_blank) begin
             sel1 <= sel_i;
             a1   <= blank_a;
             b1   <= blank_b;

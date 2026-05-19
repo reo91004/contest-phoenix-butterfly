@@ -630,3 +630,116 @@ Next ablation:
   when an ML-DSA invalid-cycle flush is actually being emitted. This removes
   the always-on PRD toggling from ML-KEM measurements while preserving the
   ML-DSA flush mechanism.
+
+## Stage 3d Log
+
+Status: measured, best balanced RTL candidate so far, but still not a TVLA pass.
+
+Strategy:
+
+- Keep Stage 3c's scheme-gated behavior: ML-KEM invalid cycles use Stage 2 zero
+  blanking, and only ML-DSA invalid cycles use op-matched PRD flushing.
+- Gate the PRD LFSR itself with the same ML-DSA invalid-cycle condition. The
+  public dummy generator no longer free-runs during ML-KEM operations.
+- Rationale: Stage 3c showed that even when PRD was not selected into ML-KEM
+  invalid operands, the always-on LFSR still correlated with worse ML-KEM TVLA
+  scores. This ablation tests whether that extra public switching source was
+  the cause.
+
+Implementation file:
+
+- `rtl/sbu/superbutterfly_sbu_routed.v`
+
+Functional correctness guardrails:
+
+- The valid datapath is unchanged: when `valid_i` is high, `sel_i`, `a_i`,
+  `b_i`, and `c_i` are registered exactly as before.
+- The PRD branch still drives `v1 = 0`, so downstream computation from that
+  branch is invalid-cycle flushing only.
+- ML-KEM invalid cycles still take the zero-blanking branch.
+- ML-DSA invalid cycles use `sel_i` as the dummy operation selector, preserving
+  the array/schoolbook operation shape rather than forcing all dummy cycles into
+  one operation class.
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.033 ns, TNS = 0.000 ns, WHS = 0.066 ns,
+  THS = 0.000 ns. This is still passing, but much tighter than previous
+  candidates and should be treated as a hardware-integration risk.
+- A three-operation subset repeat (`mlkem_ntt`, `mlkem_intt`, `mldsa_pwm`) gave
+  92.196, 43.997, and 70.945 respectively, matching the full-run direction.
+
+TVLA command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Comparison artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/comparison_vs_stage2.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3d max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 95.158 | +10.258 | +12.08% | 248 |
+| `mlkem_intt` | 65.052 | 44.948 | -20.105 | -30.91% | 248 |
+| `mlkem_pwm` | 114.713 | 123.480 | +8.767 | +7.64% | 149 |
+| `mldsa_ntt` | 132.180 | 92.929 | -39.250 | -29.69% | 538 |
+| `mldsa_intt` | 135.012 | 130.465 | -4.547 | -3.37% | 538 |
+| `mldsa_pwm` | 144.055 | 71.915 | -72.140 | -50.08% | 140 |
+
+Results vs Stage 2:
+
+| Operation | Stage 2 max abs t | Stage 3d max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 108.431 | 95.158 | -13.272 | -12.24% |
+| `mlkem_intt` | 32.655 | 44.948 | +12.293 | +37.65% |
+| `mlkem_pwm` | 108.878 | 123.480 | +14.602 | +13.41% |
+| `mldsa_ntt` | 140.159 | 92.929 | -47.229 | -33.70% |
+| `mldsa_intt` | 134.793 | 130.465 | -4.328 | -3.21% |
+| `mldsa_pwm` | 155.781 | 71.915 | -83.865 | -53.84% |
+
+Stage 3d interpretation:
+
+- Gating the LFSR strongly supports the Stage 3c root-cause hypothesis. ML-KEM
+  NTT fell from 142.259 in Stage 3c to 95.158 in Stage 3d, and ML-KEM INTT fell
+  from 79.685 to 44.948. Because ML-KEM invalid operands were zero in both
+  stages, the unusual Stage 3c regression was most likely caused by always-on
+  dummy-generator switching rather than by dummy operands entering the ML-KEM
+  arithmetic.
+- The ML-DSA benefit remains. `mldsa_pwm` is still roughly half of baseline
+  (71.915 vs 144.055), and `mldsa_ntt` is down by about 30%.
+- `mlkem_pwm` remains worse than both baseline and Stage 2. Since Stage 3d does
+  not emit PRD during ML-KEM invalid cycles, this is unlikely to be a simple
+  invalid-cycle PRD problem. More plausible causes are placement/routing changes
+  from the extra PRD logic, active-cycle cascade leakage in the PWM datapath, or
+  capture-order/predecessor-state bias in the current paired TVLA methodology.
+- All six operations still exceed the 4.5 fixed-vs-random TVLA threshold. Stage
+  3d is therefore not a complete side-channel countermeasure. It is a useful
+  blanking/flush improvement for ML-DSA idle/residual behavior, while active
+  secret-dependent arithmetic still needs deeper protection such as masking,
+  hiding, or a more targeted architectural change.
+
+Next ablation:
+
+- Methodology check: add a balanced shuffled capture order. The current capture
+  loop records one fixed trace and then one random trace every iteration. That
+  is good for slow drift cancellation, but it can confound residual-state
+  experiments because fixed traces always follow a previous random trace and
+  random traces always follow the just-captured fixed trace. A shuffled order
+  will test whether the Stage 3d ranking is robust to trace predecessor order.
