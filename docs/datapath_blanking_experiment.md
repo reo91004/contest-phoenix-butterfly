@@ -259,3 +259,56 @@ Stage 2 interpretation:
   the 4.5 threshold.
 - The NTT operations and ML-DSA PWM remain dominated by active-cycle arithmetic
   leakage, not only invalid-cycle data retention.
+
+## Stage 2b Log
+
+Status: measured, not kept as the active RTL variant.
+
+Strategy:
+
+- Keep the Stage 2 BRAM output invalid-cycle blanking.
+- During valid core reads, enable both memory-up and memory-down sides for all
+  operations instead of enabling only the selected FFT-like side.
+- Rationale: Stage 2 may have reduced unrelated active-cycle switching/noise in
+  unused memory sides, making active arithmetic leakage more visible. Stage 2b
+  tests whether retaining that switching improves TVLA without giving up invalid
+  blanking.
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, and `tb_phoenix_mldsa_pwm_io`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Vivado still inferred 8 RAMB36 true dual-port memories.
+- Final post-route timing: WNS = 0.422 ns, TNS = 0.000 ns, WHS = 0.062 ns, THS = 0.000 ns.
+- Hardware smoke TVLA: pass for `mlkem_intt`, `mldsa_ntt`, and `mldsa_pwm` with
+  one trace per group.
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 2b max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 107.580 | +22.679 | +26.71% | 248 |
+| `mlkem_intt` | 65.052 | 57.613 | -7.439 | -11.44% | 248 |
+| `mlkem_pwm` | 114.713 | 125.636 | +10.923 | +9.52% | 149 |
+| `mldsa_ntt` | 132.180 | 132.873 | +0.693 | +0.52% | 538 |
+| `mldsa_intt` | 135.012 | 121.394 | -13.618 | -10.09% | 538 |
+| `mldsa_pwm` | 144.055 | 137.125 | -6.930 | -4.81% | 140 |
+
+Repeat check:
+
+- A second Stage 2b run over `mlkem_ntt`, `mlkem_pwm`, and `mldsa_pwm` produced
+  max abs t values of 108.827, 125.885, and 163.062.
+- `mlkem_ntt` and `mlkem_pwm` therefore reproduced as worse than baseline.
+- `mldsa_pwm` remained highly variable and cannot be claimed as improved.
+
+Stage 2b interpretation:
+
+- Stage 2b is functionally and timing-clean, but it is not a better active RTL
+  choice than Stage 2.
+- It weakens the strong Stage 2 `mlkem_intt` improvement and makes ML-KEM PWM
+  worse in repeated captures.
+- It confirms that deterministic blanking experiments are now mostly moving
+  relative peak visibility around; they are not removing the active-cycle
+  arithmetic leakage source.
