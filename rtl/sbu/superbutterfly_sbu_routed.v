@@ -69,11 +69,11 @@ module superbutterfly_sbu_routed (
     // ----- COMP2 (Phase A) : pre-multiply subtraction for inverse transforms -----
     reg [31:0] c2a, c2b; reg c2_sub, c2_intt;
     always @* begin
-        c2a=a1; c2b=b1; c2_sub=1'b0; c2_intt=1'b0;
+        c2a=32'b0; c2b=32'b0; c2_sub=1'b0; c2_intt=1'b0;
         case (sel1)
             `SBU_INTT_GS,
             `SBU_MLDSA_INTT: begin c2a=b1; c2b=a1; c2_sub=1'b1; c2_intt=1'b1; end
-            default: begin c2a=a1; c2b=b1; c2_sub=1'b0; c2_intt=1'b0; end
+            default: begin c2a=32'b0; c2b=32'b0; c2_sub=1'b0; c2_intt=1'b0; end
         endcase
     end
     wire [31:0] comp2_y;
@@ -119,14 +119,16 @@ module superbutterfly_sbu_routed (
     // ----- COMP1 (Phase B) : post-multiply addition and optional scaling -----
     reg [31:0] c1a, c1b; reg c1_intt;
     always @* begin
-        c1a=a6; c1b=b6; c1_intt=1'b0;
+        c1a=32'b0; c1b=32'b0; c1_intt=1'b0;
         case (sel6)
             `SBU_NTT_CT,
             `SBU_MLDSA_NTT : begin c1a=a6; c1b=p6; c1_intt=1'b0; end
             `SBU_INTT_GS,
             `SBU_MLDSA_INTT: begin c1a=a6; c1b=b6; c1_intt=1'b1; end
             `SBU_PWM1    : begin c1a={b6[15:0],b6[15:0]}; c1b={p6[31:16],b6[31:16]}; c1_intt=1'b0; end
-            default      : begin c1a=a6; c1b=b6; c1_intt=1'b0; end
+            `SBU_PWM0,
+            `SBU_MOD_ADD : begin c1a=a6; c1b=b6; c1_intt=1'b0; end
+            default      : begin c1a=32'b0; c1b=32'b0; c1_intt=1'b0; end
         endcase
     end
     wire [31:0] comp1_y;
@@ -137,10 +139,12 @@ module superbutterfly_sbu_routed (
     // ----- COMP4 (Phase B) : post-multiply subtraction -----
     reg [31:0] c4a, c4b;
     always @* begin
-        c4a=a6; c4b=p6;
+        c4a=32'b0; c4b=32'b0;
         case (sel6)
+            `SBU_NTT_CT,
+            `SBU_MLDSA_NTT : begin c4a=a6;                 c4b=p6;                  end
             `SBU_PWM1    : begin c4a={16'b0,p6[15:0]};   c4b={16'b0,comp1_y[15:0]}; end
-            default      : begin c4a=a6;                 c4b=p6;                  end
+            default      : begin c4a=32'b0;              c4b=32'b0;               end
         endcase
     end
     wire [31:0] comp4_y;
