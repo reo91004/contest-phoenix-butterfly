@@ -1298,3 +1298,31 @@ Current decision:
   all correctness diagnostics.
 - Further improvements should target the remaining active peak locations, not
   add more global invalid-cycle PRD.
+
+## Current Ranking
+
+All values are 1000 fixed vs 1000 random, secret-distribution TVLA, using the
+available full six-operation runs.
+
+| Run | Worst op | Worst max abs t | ML-KEM avg | ML-DSA avg |
+|---|---:|---:|---:|---:|
+| `baseline` | `mldsa_pwm` | 144.055 | 88.222 | 137.082 |
+| `stage2` | `mldsa_pwm` | 155.781 | 83.321 | 143.578 |
+| `stage3d_shuffle` | `mldsa_intt` | 127.071 | 86.142 | 97.832 |
+| `stage3e_no_prd` | `mldsa_ntt` | 146.369 | 85.272 | 137.903 |
+| `stage3f_targeted` | `mldsa_intt` | 147.020 | 93.447 | 100.347 |
+| `stage3g_balanced` | `mldsa_intt` | 121.693 | 89.254 | 96.592 |
+| `stage4a_active` | `mldsa_intt` | 116.608 | 90.317 | 93.154 |
+| `stage4b_exception` | `mldsa_intt` | 112.877 | 81.091 | 92.262 |
+
+Summary:
+
+- Stage 4b is the current best candidate by worst-operation t-value and by both
+  ML-KEM/ML-DSA average t-values.
+- The progression from Stage 3d to Stage 4b shows that invalid-cycle PRD helps
+  ML-DSA, while active COMP blanking is needed to affect active arithmetic
+  windows.
+- The remaining worst operation is `mldsa_intt` at roughly 113-115. Since this
+  is still far above 4.5 and occurs in a stable active window, the next class of
+  work should be active arithmetic protection rather than more blanking-only
+  policy changes.
