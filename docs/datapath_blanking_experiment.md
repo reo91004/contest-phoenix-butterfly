@@ -61,6 +61,41 @@ Expected limitation:
 - Active valid cycles still compute on unmasked secret-dependent operands, so large
   TVLA peaks may remain.
 
+## OpenTitan Reference Model
+
+The OpenTitan material suggests two related but distinct patterns that should not
+be conflated:
+
+- OTBN-style blanking: force data paths that are not needed by the current
+  instruction to zero, and drive the blanking controls from flops rather than
+  raw decode logic. The OTBN technical specification describes this as forcing
+  unused paths to zero and applies it to register-file read/write paths and
+  unused bignum ALU/MAC paths:
+  <https://opentitan.org/book/hw/ip/otbn/>
+- AES-style PRD clearing: overwrite major key/data/state registers with
+  pseudo-random data during reset, explicit clear, and selected internal clear
+  points. The AES programmer guide documents PRD clearing on reset and
+  de-initialization:
+  <https://opentitan.org/book/hw/ip/aes/doc/programmers_guide.html>
+- AES GHASH goes one step further: after overwriting state/hash registers with
+  PRD, it runs the multipliers so multiplier-internal state and correction-term
+  registers are also cleared. The AES theory document describes this explicitly:
+  <https://opentitan.org/book/hw/ip/aes/doc/theory_of_operation.html>
+
+Mapping to PHOENIX:
+
+- Stage 1 and Stage 2 are OTBN-style deterministic blanking experiments.
+- Stage 3 will be AES-style PRD invalid-cycle flushing for SBU pipelines. The
+  valid functional transaction is unchanged; only invalid/drain/idle cycles get
+  PRD operands and a dummy selector. This is intended to clear stale SBU
+  pipeline state and to keep the multiplier from retaining a previous
+  secret-dependent value. It is not first-order masking.
+- The TVLA capture script interleaves traces as `fixed` then `random` for each
+  pair, rather than capturing all fixed traces before all random traces. This
+  reduces long-term drift confounding, but Stage 3 results must still be read
+  as an implementation-specific ablation because a deterministic free-running
+  PRD sequence can have pair-order phase effects.
+
 ## Experiment Plan
 
 1. Implement stage-1 zero blanking in the SBU and cascade path.
@@ -322,3 +357,101 @@ Stage 2b interpretation:
 - It confirms that deterministic blanking experiments are now mostly moving
   relative peak visibility around; they are not removing the active-cycle
   arithmetic leakage source.
+
+## Stage 3a Log
+
+Status: measured, not accepted as the final active countermeasure.
+
+Strategy:
+
+- Keep Stage 2 memory read-output blanking.
+- Replace the SBU invalid-cycle zero input with a deterministic public LFSR
+  pattern.
+- Use `SBU_MLDSA_PWM` as the invalid-cycle dummy selector so COMP3 receives PRD
+  operands and the ML-DSA multiplier/reduction path is exercised while
+  `valid_o` remains false.
+- This is an AES-style PRD flush ablation, not masking. Functional valid-cycle
+  inputs, output-valid timing, writeback timing, and operation cycle counts are
+  unchanged.
+
+Implementation file:
+
+- `rtl/sbu/superbutterfly_sbu_routed.v`
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Vivado still inferred 8 RAMB36 true dual-port memories.
+- Final post-route timing: WNS = 0.071 ns, TNS = 0.000 ns, WHS = 0.053 ns,
+  THS = 0.000 ns.
+- Hardware smoke TVLA: pass for `mlkem_intt`, `mldsa_ntt`, and `mldsa_pwm`
+  with one trace per group.
+
+TVLA command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Comparison artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/comparison_vs_stage2.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3a_prd_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3a max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 107.246 | +22.345 | +26.32% | 248 |
+| `mlkem_intt` | 65.052 | 102.237 | +37.184 | +57.16% | 248 |
+| `mlkem_pwm` | 114.713 | 129.216 | +14.503 | +12.64% | 149 |
+| `mldsa_ntt` | 132.180 | 96.864 | -35.316 | -26.72% | 538 |
+| `mldsa_intt` | 135.012 | 148.236 | +13.224 | +9.79% | 538 |
+| `mldsa_pwm` | 144.055 | 70.810 | -73.245 | -50.85% | 140 |
+
+Results vs Stage 2:
+
+| Operation | Stage 2 max abs t | Stage 3a max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 108.431 | 107.246 | -1.185 | -1.09% |
+| `mlkem_intt` | 32.655 | 102.237 | +69.582 | +213.08% |
+| `mlkem_pwm` | 108.878 | 129.216 | +20.338 | +18.68% |
+| `mldsa_ntt` | 140.159 | 96.864 | -43.295 | -30.89% |
+| `mldsa_intt` | 134.793 | 148.236 | +13.443 | +9.97% |
+| `mldsa_pwm` | 155.781 | 70.810 | -84.971 | -54.55% |
+
+Stage 3a interpretation:
+
+- The result is strongly asymmetric by scheme. ML-KEM worsened or stayed bad,
+  while ML-DSA NTT and ML-DSA PWM improved substantially.
+- The most plausible cause is that Stage 3a used an ML-DSA dummy selector for
+  every invalid cycle. That is scheme-matched for ML-DSA, but it forces the
+  24-bit ML-DSA COMP3 path to toggle around ML-KEM operations whose active
+  path is the packed two-lane 16-bit ML-KEM multiplier. This can add
+  deterministic phase-dependent switching rather than useful de-correlation.
+- `mlkem_intt` is the clearest rejection signal: Stage 2 had a stable
+  improvement near 32.5, but Stage 3a raised it to 102.2. Therefore the PRD
+  mechanism itself is not enough; the dummy selector must be operation-matched
+  or the PRD source must be placed somewhere less disruptive.
+- `mldsa_pwm` improved from 144.1 baseline / 155.8 Stage 2 to 70.8. This is
+  real enough to preserve as a useful clue: PRD flushing of the ML-DSA
+  multiplier path can reduce a large part of the ML-DSA pointwise leakage, even
+  though it does not cross the 4.5 TVLA threshold.
+
+Next ablation:
+
+- Stage 3b: keep PRD invalid-cycle operands, but drive the invalid-cycle
+  selector from the current operation selector (`sel_i`) instead of always using
+  `SBU_MLDSA_PWM`. This keeps the SuperButterfly latency and functional behavior
+  unchanged while making the dummy flush scheme/op matched.

@@ -29,13 +29,39 @@ module superbutterfly_sbu_routed (
     output wire [31:0] y1_o
 );
     localparam [8:0] SEL_BLANK = `SBU_MOD_ADD;
+    localparam       USE_PRD_INVALID_BLANKING = 1'b1;
+    localparam [8:0] SEL_PRD_BLANK = `SBU_MLDSA_PWM;
+
+    // Deterministic PRD source for invalid-cycle pipeline flushing. This is
+    // public, unkeyed, and not a replacement for masking; it only prevents
+    // invalid SBU stages from retaining the previous functional operands.
+    reg [31:0] blank_lfsr;
+    wire blank_lfsr_fb = blank_lfsr[31] ^ blank_lfsr[21] ^ blank_lfsr[1] ^ blank_lfsr[0];
+    wire [31:0] blank_lfsr_next = {blank_lfsr[30:0], blank_lfsr_fb};
+    wire [31:0] blank_a = blank_lfsr;
+    wire [31:0] blank_b = {blank_lfsr[15:0], blank_lfsr[31:16]} ^ 32'hA5A55A5A;
+    wire [31:0] blank_c = {blank_lfsr[7:0], blank_lfsr[31:8]} ^ 32'h3C6EF372;
+
+    always @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            blank_lfsr <= 32'h6D2B79F5;
+        end else begin
+            blank_lfsr <= blank_lfsr_next;
+        end
+    end
 
     // ===== s1: 입력 레지스터 =====
     reg [8:0]  sel1; reg [31:0] a1,b1,c1; reg v1;
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin sel1<=9'b0;a1<=0;b1<=0;c1<=0;v1<=1'b0; end
         else if (valid_i) begin sel1<=sel_i;a1<=a_i;b1<=b_i;c1<=c_i;v1<=1'b1; end
-        else begin sel1<=SEL_BLANK;a1<=32'b0;b1<=32'b0;c1<=32'b0;v1<=1'b0; end
+        else if (USE_PRD_INVALID_BLANKING) begin
+            sel1 <= SEL_PRD_BLANK;
+            a1   <= blank_a;
+            b1   <= blank_b;
+            c1   <= blank_c;
+            v1   <= 1'b0;
+        end else begin sel1<=SEL_BLANK;a1<=32'b0;b1<=32'b0;c1<=32'b0;v1<=1'b0; end
     end
     wire opmode1 = `SBU_OPMODE(sel1);
 
