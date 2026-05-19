@@ -243,18 +243,27 @@ module phoenix_top #(
                 pwm_wb_a0[pwi] <= {ADDR_W{1'b0}};
             end
         end else begin
-            wb_b0[0] <= bk0a; wb_a0[0] <= ad0a;
-            wb_b1[0] <= bk0b; wb_a1[0] <= ad0b;
-            wb_b2[0] <= bk1a; wb_a2[0] <= ad1a;
-            wb_b3[0] <= bk1b; wb_a3[0] <= ad1b;
+            if (idx_valid) begin
+                wb_b0[0] <= bk0a; wb_a0[0] <= ad0a;
+                wb_b1[0] <= bk0b; wb_a1[0] <= ad0b;
+                wb_b2[0] <= bk1a; wb_a2[0] <= ad1a;
+                wb_b3[0] <= bk1b; wb_a3[0] <= ad1b;
+                pwm_wb_b0[0] <= bk0a;
+                pwm_wb_a0[0] <= ad0a;
+            end else begin
+                wb_b0[0] <= 2'b0; wb_a0[0] <= {ADDR_W{1'b0}};
+                wb_b1[0] <= 2'b0; wb_a1[0] <= {ADDR_W{1'b0}};
+                wb_b2[0] <= 2'b0; wb_a2[0] <= {ADDR_W{1'b0}};
+                wb_b3[0] <= 2'b0; wb_a3[0] <= {ADDR_W{1'b0}};
+                pwm_wb_b0[0] <= 2'b0;
+                pwm_wb_a0[0] <= {ADDR_W{1'b0}};
+            end
             for (wi = 1; wi < WB_LAT; wi = wi + 1) begin
                 wb_b0[wi] <= wb_b0[wi-1]; wb_a0[wi] <= wb_a0[wi-1];
                 wb_b1[wi] <= wb_b1[wi-1]; wb_a1[wi] <= wb_a1[wi-1];
                 wb_b2[wi] <= wb_b2[wi-1]; wb_a2[wi] <= wb_a2[wi-1];
                 wb_b3[wi] <= wb_b3[wi-1]; wb_a3[wi] <= wb_a3[wi-1];
             end
-            pwm_wb_b0[0] <= bk0a;
-            pwm_wb_a0[0] <= ad0a;
             for (pwi = 1; pwi < PWM_WB_LAT; pwi = pwi + 1) begin
                 pwm_wb_b0[pwi] <= pwm_wb_b0[pwi-1];
                 pwm_wb_a0[pwi] <= pwm_wb_a0[pwi-1];
@@ -314,6 +323,12 @@ module phoenix_top #(
     wire [4*ADDR_W-1:0] md_b_addr_w = wb_addr_fft;
     wire [4*DATA_W-1:0] md_b_din_w = wb_din_fft;
 
+    wire [3:0] host_read_en = pack_we1(host_active, host_bank);
+    wire       core_reads_both_sides = is_mlkem_pwm || is_mldsa_pwm;
+    wire [3:0] core_mu_read_en = (idx_valid && (!ctl_mem_down || core_reads_both_sides)) ? 4'hf : 4'b0;
+    wire [3:0] core_md_read_en = (idx_valid && ( ctl_mem_down || core_reads_both_sides)) ? 4'hf : 4'b0;
+    wire [3:0] mu_a_en_w = host_mu ? host_read_en : core_mu_read_en;
+    wire [3:0] md_a_en_w = host_md ? host_read_en : core_md_read_en;
     wire [3:0] mu_a_we_w = host_mu ? host_we4 : 4'b0;
     wire [4*ADDR_W-1:0] mu_a_addr_w = host_mu ? host_addr4 : read_addr;
     wire [4*DATA_W-1:0] mu_a_din_w = host_mu ? host_din4 : {4*DATA_W{1'b0}};
@@ -323,6 +338,7 @@ module phoenix_top #(
 
     poly_memory_updown #(.DEPTH(1024), .DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_pm (
         .clk      (clk),
+        .mu_a_en   (mu_a_en_w),
         .mu_a_we  (mu_a_we_w),
         .mu_a_addr(mu_a_addr_w),
         .mu_a_din (mu_a_din_w),
@@ -330,6 +346,7 @@ module phoenix_top #(
         .mu_b_we  (mu_b_we_w),
         .mu_b_addr(mu_b_addr_w),
         .mu_b_din (mu_b_din_w),
+        .md_a_en   (md_a_en_w),
         .md_a_we  (md_a_we_w),
         .md_a_addr(md_a_addr_w),
         .md_a_din (md_a_din_w),

@@ -177,3 +177,85 @@ Initial interpretation:
   zero blanking reduces unrelated switching/noise in surrounding invalid cycles,
   making active secret-dependent arithmetic peaks sharper. This needs a follow-up
   A/B rerun before treating the magnitude as intrinsic.
+
+Repeat check:
+
+- A second Stage 1 run over `mlkem_intt`, `mldsa_intt`, and `mldsa_pwm` produced
+  max abs t values of 192.295, 98.240, and 166.229.
+- The `mlkem_intt` worsening and `mldsa_intt` improvement therefore reproduced.
+- `mldsa_pwm` varied significantly between runs, so the Stage 1 apparent PWM
+  improvement should not be treated as stable.
+
+## Stage 2 Log
+
+Status: implemented and measured.
+
+Strategy:
+
+- Add a read enable to each polynomial-memory port-A BRAM output register.
+- Force BRAM read outputs to zero when neither a valid core read nor a valid host
+  access is being issued.
+- During FFT-like operations, enable only the memory side selected by
+  `ctl_mem_down`; during pointwise multiplication, enable both memory sides.
+- Blank writeback address-pipe stage 0 when `idx_valid` is false. This keeps
+  invalid writeback metadata from retaining the previous transaction while still
+  allowing older valid metadata to drain through the pipe.
+
+Implementation files:
+
+- `rtl/phoenix/poly_memory_updown.v`
+- `rtl/phoenix/phoenix_top.v`
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Vivado still inferred 8 RAMB36 true dual-port memories.
+- Final CW305 bitstream: `boards/cw305/output/phoenix_cw305.bit`, generated
+  2026-05-20 00:53:28 KST.
+- Final post-route timing: WNS = 0.087 ns, TNS = 0.000 ns, WHS = 0.078 ns, THS = 0.000 ns.
+- Hardware smoke TVLA: pass for `mlkem_intt`, `mldsa_intt`, and `mldsa_pwm` with
+  one trace per group.
+
+TVLA command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Comparison artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/comparison_vs_stage1.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/comparison_vs_stage1.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage2_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 2 max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 108.431 | +23.530 | +27.71% | 248 |
+| `mlkem_intt` | 65.052 | 32.655 | -32.398 | -49.80% | 248 |
+| `mlkem_pwm` | 114.713 | 108.878 | -5.835 | -5.09% | 149 |
+| `mldsa_ntt` | 132.180 | 140.159 | +7.979 | +6.04% | 538 |
+| `mldsa_intt` | 135.012 | 134.793 | -0.219 | -0.16% | 538 |
+| `mldsa_pwm` | 144.055 | 155.781 | +11.726 | +8.14% | 140 |
+
+Stage 2 interpretation:
+
+- Stage 2 is functionally and timing-clean.
+- Stage 2 substantially fixes the Stage 1 `mlkem_intt` regression and improves it
+  below the original baseline, which points to a real BRAM-output or read-side
+  retention component for ML-KEM INTT.
+- It does not fix first-order leakage overall. All six operations still exceed
+  the 4.5 threshold.
+- The NTT operations and ML-DSA PWM remain dominated by active-cycle arithmetic
+  leakage, not only invalid-cycle data retention.
