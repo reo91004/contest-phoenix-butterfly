@@ -260,6 +260,16 @@ Stage 2 interpretation:
 - The NTT operations and ML-DSA PWM remain dominated by active-cycle arithmetic
   leakage, not only invalid-cycle data retention.
 
+Repeat check:
+
+- After the Stage 2b rejection, the active Stage 2 bitstream was rebuilt at
+  2026-05-20 01:19:10 KST and again met timing with WNS = 0.087 ns.
+- A repeat Stage 2 run over `mlkem_ntt`, `mlkem_intt`, and `mldsa_pwm` produced
+  max abs t values of 113.954, 32.480, and 169.739.
+- The `mlkem_intt` improvement is stable across Stage 2 captures.
+- The `mlkem_ntt` and `mldsa_pwm` regressions are also stable enough to treat as
+  real for this blanking family.
+
 ## Stage 2b Log
 
 Status: measured, not kept as the active RTL variant.
