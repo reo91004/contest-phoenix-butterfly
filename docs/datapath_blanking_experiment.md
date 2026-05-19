@@ -743,3 +743,102 @@ Next ablation:
   experiments because fixed traces always follow a previous random trace and
   random traces always follow the just-captured fixed trace. A shuffled order
   will test whether the Stage 3d ranking is robust to trace predecessor order.
+
+## Stage 3d Methodology Check: Shuffled Capture Order
+
+Status: measured.
+
+Purpose:
+
+- Keep the Stage 3d bitstream unchanged.
+- Keep the same 1000 fixed vs 1000 random trace count, same secret distributions,
+  same slots, and same fixed secret seed.
+- Change only the capture schedule from deterministic fixed-then-random pairs to
+  a balanced shuffled order.
+- This isolates whether the current paired TVLA loop is creating
+  predecessor-state bias in residual-blanking experiments.
+
+Implementation files:
+
+- `scripts/tvla/phoenix_capture_tvla.py`
+- `scripts/tvla/run_mlkem_mldsa_1000.sh`
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_stage3d_paired.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_stage3d_paired.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/comparison_vs_stage2.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3d_gated_lfsr_shuffle_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs Stage 3d paired:
+
+| Operation | Stage 3d paired max abs t | Stage 3d shuffled max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 95.158 | 99.210 | +4.051 | +4.26% |
+| `mlkem_intt` | 44.948 | 44.315 | -0.633 | -1.41% |
+| `mlkem_pwm` | 123.480 | 114.901 | -8.579 | -6.95% |
+| `mldsa_ntt` | 92.929 | 94.490 | +1.560 | +1.68% |
+| `mldsa_intt` | 130.465 | 127.071 | -3.394 | -2.60% |
+| `mldsa_pwm` | 71.915 | 71.935 | +0.020 | +0.03% |
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3d shuffled max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 99.210 | +14.309 | +16.85% |
+| `mlkem_intt` | 65.052 | 44.315 | -20.738 | -31.88% |
+| `mlkem_pwm` | 114.713 | 114.901 | +0.189 | +0.16% |
+| `mldsa_ntt` | 132.180 | 94.490 | -37.690 | -28.51% |
+| `mldsa_intt` | 135.012 | 127.071 | -7.941 | -5.88% |
+| `mldsa_pwm` | 144.055 | 71.935 | -72.120 | -50.06% |
+
+Results vs Stage 2:
+
+| Operation | Stage 2 max abs t | Stage 3d shuffled max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 108.431 | 99.210 | -9.221 | -8.50% |
+| `mlkem_intt` | 32.655 | 44.315 | +11.660 | +35.71% |
+| `mlkem_pwm` | 108.878 | 114.901 | +6.023 | +5.53% |
+| `mldsa_ntt` | 140.159 | 94.490 | -45.669 | -32.58% |
+| `mldsa_intt` | 134.793 | 127.071 | -7.722 | -5.73% |
+| `mldsa_pwm` | 155.781 | 71.935 | -83.845 | -53.82% |
+
+Shuffled-order interpretation:
+
+- The Stage 3d ranking is robust. Five of six operations moved by less than 7%
+  relative to the paired Stage 3d run, and the peak indices stayed identical for
+  all six operations. This means the main Stage 3d conclusions are not explained
+  by fixed-then-random predecessor ordering.
+- `mldsa_pwm` is especially stable: 71.915 paired vs 71.935 shuffled. This is
+  strong evidence that the ML-DSA PWM improvement is an RTL effect of the
+  scheme-gated PRD invalid-cycle flush, not a capture-order artifact.
+- The unusual `mlkem_pwm` regression softened from 123.480 paired to 114.901
+  shuffled. This suggests that the paired order was adding some run-order or
+  predecessor-state sensitivity for PWM, but it does not make the operation safe:
+  the shuffled result is still essentially equal to the original baseline and
+  still far above the TVLA threshold.
+- Because the shuffled ML-KEM PWM peak index stayed at 63, the remaining
+  leakage is likely tied to the active PWM computation window rather than a
+  random capture-order spike. Invalid-cycle blanking alone is not the right
+  lever for that signal.
+
+Decision after methodology check:
+
+- Treat Stage 3d as the best blanking candidate so far for ML-DSA, especially
+  `mldsa_pwm`.
+- Do not claim first-order TVLA success. The next useful experiments should
+  separate active arithmetic leakage from blanking/placement side effects,
+  rather than adding more invalid-cycle PRD globally.
