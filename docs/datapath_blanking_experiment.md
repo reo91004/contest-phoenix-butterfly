@@ -455,3 +455,88 @@ Next ablation:
   selector from the current operation selector (`sel_i`) instead of always using
   `SBU_MLDSA_PWM`. This keeps the SuperButterfly latency and functional behavior
   unchanged while making the dummy flush scheme/op matched.
+
+## Stage 3b Log
+
+Status: measured, not accepted as the final active countermeasure.
+
+Strategy:
+
+- Keep the Stage 3a public LFSR PRD invalid-cycle operands.
+- Change only the invalid-cycle selector: use the current operation selector
+  `sel_i` instead of hard-wiring `SBU_MLDSA_PWM`.
+- Rationale: Stage 3a improved ML-DSA NTT/PWM but worsened ML-KEM. The likely
+  cause was an ML-DSA dummy multiplier/reducer being used around ML-KEM
+  operations. Stage 3b isolates selector/opmode matching from the PRD data
+  source itself.
+
+Implementation file:
+
+- `rtl/sbu/superbutterfly_sbu_routed.v`
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Vivado still inferred 8 RAMB36 true dual-port memories.
+- Final post-route timing: WNS = 0.325 ns, TNS = 0.000 ns, WHS = 0.077 ns,
+  THS = 0.000 ns.
+- Hardware smoke TVLA: pass for `mlkem_intt`, `mldsa_ntt`, and `mldsa_pwm`
+  with one trace per group.
+
+TVLA command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Comparison artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/comparison_vs_stage2.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3b_prd_opmatched_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3b max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 121.281 | +36.381 | +42.85% | 248 |
+| `mlkem_intt` | 65.052 | 67.855 | +2.802 | +4.31% | 248 |
+| `mlkem_pwm` | 114.713 | 123.381 | +8.669 | +7.56% | 149 |
+| `mldsa_ntt` | 132.180 | 87.880 | -44.300 | -33.51% | 538 |
+| `mldsa_intt` | 135.012 | 131.437 | -3.576 | -2.65% | 538 |
+| `mldsa_pwm` | 144.055 | 72.497 | -71.558 | -49.67% | 140 |
+
+Results vs Stage 2:
+
+| Operation | Stage 2 max abs t | Stage 3b max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 108.431 | 121.281 | +12.851 | +11.85% |
+| `mlkem_intt` | 32.655 | 67.855 | +35.200 | +107.79% |
+| `mlkem_pwm` | 108.878 | 123.381 | +14.503 | +13.32% |
+| `mldsa_ntt` | 140.159 | 87.880 | -52.279 | -37.30% |
+| `mldsa_intt` | 134.793 | 131.437 | -3.357 | -2.49% |
+| `mldsa_pwm` | 155.781 | 72.497 | -83.284 | -53.46% |
+
+Stage 3b interpretation:
+
+- Operation-matching the dummy selector fixed part of the Stage 3a ML-KEM INTT
+  regression, but not enough to beat Stage 2. ML-KEM NTT and PWM remain worse
+  than both baseline and Stage 2.
+- ML-DSA NTT and PWM improvements reproduced. This makes it unlikely that the
+  Stage 3a ML-DSA improvements were only a one-off capture artifact.
+- The cleanest reading is scheme-specific: PRD invalid-cycle flushing in the
+  SBU is useful for the ML-DSA datapath, especially ML-DSA PWM, but it is
+  counterproductive for ML-KEM in this placement.
+- Therefore the next logically consistent variant is not "more PRD everywhere."
+  It is a hybrid: preserve Stage 2 zero blanking for ML-KEM invalid cycles and
+  apply PRD op-matched invalid flushing only when `sel_i[8]` selects ML-DSA.

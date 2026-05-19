@@ -30,7 +30,6 @@ module superbutterfly_sbu_routed (
 );
     localparam [8:0] SEL_BLANK = `SBU_MOD_ADD;
     localparam       USE_PRD_INVALID_BLANKING = 1'b1;
-    localparam [8:0] SEL_PRD_BLANK = `SBU_MLDSA_PWM;
 
     // Deterministic PRD source for invalid-cycle pipeline flushing. This is
     // public, unkeyed, and not a replacement for masking; it only prevents
@@ -56,7 +55,7 @@ module superbutterfly_sbu_routed (
         if (!rst_ni) begin sel1<=9'b0;a1<=0;b1<=0;c1<=0;v1<=1'b0; end
         else if (valid_i) begin sel1<=sel_i;a1<=a_i;b1<=b_i;c1<=c_i;v1<=1'b1; end
         else if (USE_PRD_INVALID_BLANKING) begin
-            sel1 <= SEL_PRD_BLANK;
+            sel1 <= sel_i;
             a1   <= blank_a;
             b1   <= blank_b;
             c1   <= blank_c;
