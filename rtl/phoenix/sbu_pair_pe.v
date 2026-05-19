@@ -70,10 +70,10 @@ module sbu_pair_pe (
                 cascade_c_pipe[ci] <= 32'b0;
             end
         end else begin
-            cascade_a_r     <= sbu0_out0;
-            cascade_b_r     <= sbu0_out1;
+            cascade_a_r     <= sbu0_valid_out ? sbu0_out0 : 32'b0;
+            cascade_b_r     <= sbu0_valid_out ? sbu0_out1 : 32'b0;
             cascade_valid_r <= sbu0_valid_out;
-            cascade_c_pipe[0] <= sbu0_c;
+            cascade_c_pipe[0] <= valid0_in ? sbu0_c : 32'b0;
             for (ci = 1; ci < 9; ci = ci + 1) begin
                 cascade_c_pipe[ci] <= cascade_c_pipe[ci-1];
             end

@@ -28,11 +28,14 @@ module superbutterfly_sbu_routed (
     output wire [31:0] y0_o,
     output wire [31:0] y1_o
 );
+    localparam [8:0] SEL_BLANK = `SBU_MOD_ADD;
+
     // ===== s1: 입력 레지스터 =====
     reg [8:0]  sel1; reg [31:0] a1,b1,c1; reg v1;
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin sel1<=9'b0;a1<=0;b1<=0;c1<=0;v1<=1'b0; end
-        else begin sel1<=sel_i;a1<=a_i;b1<=b_i;c1<=c_i;v1<=valid_i; end
+        else if (valid_i) begin sel1<=sel_i;a1<=a_i;b1<=b_i;c1<=c_i;v1<=1'b1; end
+        else begin sel1<=SEL_BLANK;a1<=32'b0;b1<=32'b0;c1<=32'b0;v1<=1'b0; end
     end
     wire opmode1 = `SBU_OPMODE(sel1);
 
@@ -139,7 +142,8 @@ module superbutterfly_sbu_routed (
     reg [31:0] y0r,y1r; reg vr;
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin y0r<=0;y1r<=0;vr<=1'b0; end
-        else begin y0r<=y0p; y1r<=y1p; vr<=v6; end
+        else if (v6) begin y0r<=y0p; y1r<=y1p; vr<=1'b1; end
+        else begin y0r<=32'b0; y1r<=32'b0; vr<=1'b0; end
     end
     assign y0_o=y0r; assign y1_o=y1r; assign valid_o=vr;
 endmodule
