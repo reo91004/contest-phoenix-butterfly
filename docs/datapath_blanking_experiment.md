@@ -1035,3 +1035,160 @@ Stage 3f interpretation:
 - As a single all-operation bitstream, Stage 3d is still more balanced. Stage 3f
   is useful evidence that operation-specific PRD can optimize NTT/PWM, but it
   should not replace Stage 3d without an additional INTT-specific mitigation.
+
+## Stage 3g Log: Balanced PRD Repeat
+
+Status: measured repeat; superseded by Stage 4a as the active RTL, but still the
+cleanest invalid-cycle-only countermeasure.
+
+Strategy:
+
+- Return from Stage 3f's NTT/PWM-only policy to the balanced Stage 3d policy:
+  apply PRD invalid-cycle flushing to all ML-DSA selectors.
+- Keep ML-KEM invalid cycles on zero blanking.
+- Purpose: confirm that Stage 3d's balanced result is reproducible after the
+  Stage 3e/3f ablations.
+
+Verification results:
+
+- Key Verilator regression: pass.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.033 ns, TNS = 0.000 ns, WHS = 0.066 ns,
+  THS = 0.000 ns.
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3g_balanced_prd_repeat_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Results vs Stage 3d shuffled:
+
+| Operation | Stage 3d shuffled max abs t | Stage 3g max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 99.210 | 98.885 | -0.325 | -0.33% |
+| `mlkem_intt` | 44.315 | 48.363 | +4.048 | +9.13% |
+| `mlkem_pwm` | 114.901 | 120.513 | +5.612 | +4.88% |
+| `mldsa_ntt` | 94.490 | 93.214 | -1.276 | -1.35% |
+| `mldsa_intt` | 127.071 | 121.693 | -5.378 | -4.23% |
+| `mldsa_pwm` | 71.935 | 74.868 | +2.932 | +4.08% |
+
+Stage 3g interpretation:
+
+- The balanced PRD policy is reproducible. All six operations stay within about
+  10% of Stage 3d shuffled, and peak locations are stable.
+- Compared with Stage 3f, the balanced policy fixes the reproducible INTT
+  regression while giving up only a small amount on `mldsa_ntt` and `mldsa_pwm`.
+- The downside is timing: WNS = 0.033 ns is passing but thin.
+
+## Stage 4a Log: Active COMP Blanking
+
+Status: measured; current active RTL candidate.
+
+Strategy:
+
+- Keep Stage 3g's balanced ML-DSA PRD invalid-cycle flushing.
+- Add active-cycle blanking for COMP inputs that are not used by the selected
+  operation:
+  - COMP2 is driven only for inverse transform modes where `comp2_y` feeds the
+    multiplier.
+  - COMP1 is zeroed for operations such as ML-DSA PWM where its output is not
+    selected.
+  - COMP4 is driven only for NTT and ML-KEM PWM1 where its output is selected.
+- Rationale: this is closer to OpenTitan-style datapath blanking than invalid
+  cycle flushing alone, because it stops unused active arithmetic cones from
+  switching on secret operands.
+
+Functional correctness guardrails:
+
+- SuperButterfly latency and valid handling are unchanged.
+- Output mux behavior is unchanged.
+- Only inputs to arithmetic blocks whose outputs are unused for the current
+  selector are blanked.
+- Verilator, consistency, and bank-conflict diagnostics all passed.
+
+Verification and implementation:
+
+- Implementation file: `rtl/sbu/superbutterfly_sbu_routed.v`
+- Key Verilator regression: pass.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.238 ns, TNS = 0.000 ns, WHS = 0.087 ns,
+  THS = 0.000 ns. This is much healthier than Stage 3g.
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/comparison_vs_stage3g.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/comparison_vs_stage3f.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs Stage 3g:
+
+| Operation | Stage 3g max abs t | Stage 4a max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 98.885 | 88.877 | -10.008 | -10.12% |
+| `mlkem_intt` | 48.363 | 69.162 | +20.799 | +43.01% |
+| `mlkem_pwm` | 120.513 | 112.912 | -7.602 | -6.31% |
+| `mldsa_ntt` | 93.214 | 93.286 | +0.072 | +0.08% |
+| `mldsa_intt` | 121.693 | 116.608 | -5.085 | -4.18% |
+| `mldsa_pwm` | 74.868 | 69.567 | -5.301 | -7.08% |
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 4a max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 88.877 | +3.977 | +4.68% |
+| `mlkem_intt` | 65.052 | 69.162 | +4.109 | +6.32% |
+| `mlkem_pwm` | 114.713 | 112.912 | -1.801 | -1.57% |
+| `mldsa_ntt` | 132.180 | 93.286 | -38.894 | -29.43% |
+| `mldsa_intt` | 135.012 | 116.608 | -18.404 | -13.63% |
+| `mldsa_pwm` | 144.055 | 69.567 | -74.488 | -51.71% |
+
+Key repeat:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage4a_active_comp_blanking_key_repeat_20260520_cw305_husky_1000 \
+OPS='mlkem_intt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0xB10C \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Repeat results:
+
+| Operation | Stage 4a full max abs t | Stage 4a repeat max abs t | Repeat peak |
+|---|---:|---:|---:|
+| `mlkem_intt` | 69.162 | 67.735 | 182 |
+| `mldsa_intt` | 116.608 | 122.229 | 123 |
+| `mldsa_pwm` | 69.567 | 71.009 | 114 |
+
+Stage 4a interpretation:
+
+- Stage 4a is the best all-operation candidate so far by the worst observed
+  operation in the full run: the maximum drops to 116.608, compared with 121.693
+  for Stage 3g and 127.071 for Stage 3d shuffled.
+- The ML-DSA side is consistently better or comparable: `mldsa_pwm` stays near
+  70 and `mldsa_intt` improves relative to Stage 3g.
+- `mlkem_ntt` and `mlkem_pwm` improve relative to Stage 3g, but `mlkem_intt`
+  regresses reproducibly. This is the main Stage 4a tradeoff.
+- The likely cause is that INTT genuinely uses COMP2 in the active path, so the
+  new selector-dependent blanking logic changes the nearby arithmetic cone and
+  placement even though functional behavior is unchanged. This looks like a
+  physical/leakage-shape tradeoff, not a logical correctness failure.
+- Stage 4a still does not pass first-order TVLA. It is a stronger datapath
+  blanking patch, not a masking scheme.
