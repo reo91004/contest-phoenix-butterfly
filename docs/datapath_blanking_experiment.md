@@ -1192,3 +1192,109 @@ Stage 4a interpretation:
   physical/leakage-shape tradeoff, not a logical correctness failure.
 - Stage 4a still does not pass first-order TVLA. It is a stronger datapath
   blanking patch, not a masking scheme.
+
+## Stage 4b Log: ML-KEM INTT COMP4 Exception
+
+Status: measured; current best active RTL candidate.
+
+Strategy:
+
+- Keep Stage 4a active COMP blanking.
+- Add one exception: for ML-KEM INTT (`SBU_INTT_GS`), drive COMP4 with the
+  previous active inputs (`a6`, `p6`) instead of zeroing COMP4.
+- Keep ML-DSA INTT COMP4 blanked.
+- Rationale: Stage 4a's main regression was reproducible on `mlkem_intt`.
+  During INTT, COMP2 and COMP1 are functionally used, while COMP4 is unused.
+  Therefore the only active arithmetic cone changed specifically for INTT was
+  COMP4 blanking. Stage 4b tests whether restoring COMP4 switching only for
+  ML-KEM INTT recovers that operation without giving up the Stage 4a benefits.
+
+Verification and implementation:
+
+- Implementation file: `rtl/sbu/superbutterfly_sbu_routed.v`
+- Key Verilator regression: pass.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Final post-route timing: WNS = 0.203 ns, TNS = 0.000 ns, WHS = 0.063 ns,
+  THS = 0.000 ns.
+
+Command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0x5EED \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/comparison_vs_stage4a.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/comparison_vs_stage3g.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs Stage 4a:
+
+| Operation | Stage 4a max abs t | Stage 4b max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 88.877 | 96.516 | +7.639 | +8.60% |
+| `mlkem_intt` | 69.162 | 42.888 | -26.274 | -37.99% |
+| `mlkem_pwm` | 112.912 | 103.869 | -9.042 | -8.01% |
+| `mldsa_ntt` | 93.286 | 85.738 | -7.548 | -8.09% |
+| `mldsa_intt` | 116.608 | 112.877 | -3.731 | -3.20% |
+| `mldsa_pwm` | 69.567 | 78.170 | +8.603 | +12.37% |
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 4b max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 96.516 | +11.616 | +13.68% |
+| `mlkem_intt` | 65.052 | 42.888 | -22.165 | -34.07% |
+| `mlkem_pwm` | 114.713 | 103.869 | -10.843 | -9.45% |
+| `mldsa_ntt` | 132.180 | 85.738 | -46.442 | -35.14% |
+| `mldsa_intt` | 135.012 | 112.877 | -22.135 | -16.39% |
+| `mldsa_pwm` | 144.055 | 78.170 | -65.885 | -45.74% |
+
+Key repeat:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage4b_kem_intt_comp4_exception_key_repeat_20260520_cw305_husky_1000 \
+OPS='mlkem_pwm mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto TRACE_ORDER=shuffle ORDER_SEED=0xC0DEC \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Repeat results:
+
+| Operation | Stage 4b full max abs t | Stage 4b repeat max abs t | Repeat peak |
+|---|---:|---:|---:|
+| `mlkem_pwm` | 103.869 | 105.388 | 63 |
+| `mldsa_intt` | 112.877 | 114.900 | 123 |
+| `mldsa_pwm` | 78.170 | 74.680 | 109 |
+
+Stage 4b interpretation:
+
+- Stage 4b is the best all-operation blanking candidate measured so far by
+  worst-operation score: the full-run maximum is 112.877, lower than Stage 4a
+  (116.608), Stage 3g (121.693), and Stage 3d shuffled (127.071).
+- The ML-KEM INTT regression from Stage 4a is fixed: 69.162 becomes 42.888.
+  This supports the local root-cause hypothesis that zeroing unused COMP4 during
+  ML-KEM INTT changed the active leakage shape unfavorably.
+- The exception also helps `mlkem_pwm`, `mldsa_ntt`, and `mldsa_intt` in this
+  build, but it costs `mlkem_ntt` and `mldsa_pwm` relative to Stage 4a.
+- The key repeat confirms the important Stage 4b values are stable: `mlkem_pwm`
+  stays around 105, `mldsa_intt` around 113-115, and `mldsa_pwm` around 75-78.
+- Stage 4b is still not a TVLA pass. The remaining peaks are active arithmetic
+  leakage candidates; data-path blanking alone is not sufficient to cross the
+  4.5 threshold.
+
+Current decision:
+
+- Keep Stage 4b as the active RTL candidate because it gives the best
+  all-operation balance while preserving SuperButterfly structure and passing
+  all correctness diagnostics.
+- Further improvements should target the remaining active peak locations, not
+  add more global invalid-cycle PRD.
