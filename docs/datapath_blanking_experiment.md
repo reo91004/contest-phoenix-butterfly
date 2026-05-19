@@ -540,3 +540,93 @@ Stage 3b interpretation:
 - Therefore the next logically consistent variant is not "more PRD everywhere."
   It is a hybrid: preserve Stage 2 zero blanking for ML-KEM invalid cycles and
   apply PRD op-matched invalid flushing only when `sel_i[8]` selects ML-DSA.
+
+## Stage 3c Log
+
+Status: measured, not accepted as the final active countermeasure.
+
+Strategy:
+
+- Keep Stage 2 zero blanking for ML-KEM invalid cycles.
+- Apply Stage 3b op-matched PRD invalid flushing only when the current selector
+  is ML-DSA (`sel_i[8] == 1`).
+- Rationale: Stage 3b showed useful ML-DSA NTT/PWM reductions but harmful
+  ML-KEM reductions. Stage 3c tests whether a scheme-gated hybrid can keep both
+  sides' best behavior.
+
+Implementation file:
+
+- `rtl/sbu/superbutterfly_sbu_routed.v`
+
+Verification results:
+
+- Key Verilator regression: pass for `tb_phoenix_host_io`, `tb_phoenix_core`,
+  `tb_phoenix_cw305_wrapper`, `tb_phoenix_mldsa_pwm_io`, and
+  `tb_superbutterfly_all_modes`.
+- Consistency diagnostic: pass.
+- Bank-conflict diagnostic: pass.
+- Vivado still inferred 8 RAMB36 true dual-port memories.
+- Final post-route timing: WNS = 0.255 ns, TNS = 0.000 ns, WHS = 0.071 ns,
+  THS = 0.000 ns.
+- Hardware smoke TVLA: pass for `mlkem_intt`, `mldsa_ntt`, and `mldsa_pwm`
+  with one trace per group.
+
+TVLA command:
+
+```sh
+OUTDIR=reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000 \
+OPS='mlkem_ntt mlkem_intt mlkem_pwm mldsa_ntt mldsa_intt mldsa_pwm' \
+TRACES=1000 SECRET_DIST=auto \
+bash scripts/tvla/run_mlkem_mldsa_1000.sh
+```
+
+Comparison artifacts:
+
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/summary.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/comparison_vs_baseline.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/comparison_vs_baseline.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/comparison_vs_stage2.csv`
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/comparison_vs_stage2.png`
+- `reports/tvla/mlkem_mldsa_blanking_stage3c_hybrid_20260520_cw305_husky_1000/mlkem_mldsa_tvla_overview.png`
+
+Results vs baseline:
+
+| Operation | Baseline max abs t | Stage 3c max abs t | Delta | Delta % | Cycles |
+|---|---:|---:|---:|---:|---:|
+| `mlkem_ntt` | 84.901 | 142.259 | +57.358 | +67.56% | 248 |
+| `mlkem_intt` | 65.052 | 79.685 | +14.632 | +22.49% | 248 |
+| `mlkem_pwm` | 114.713 | 114.232 | -0.480 | -0.42% | 149 |
+| `mldsa_ntt` | 132.180 | 106.959 | -25.221 | -19.08% | 538 |
+| `mldsa_intt` | 135.012 | 114.004 | -21.008 | -15.56% | 538 |
+| `mldsa_pwm` | 144.055 | 68.711 | -75.344 | -52.30% | 140 |
+
+Results vs Stage 2:
+
+| Operation | Stage 2 max abs t | Stage 3c max abs t | Delta | Delta % |
+|---|---:|---:|---:|---:|
+| `mlkem_ntt` | 108.431 | 142.259 | +33.829 | +31.20% |
+| `mlkem_intt` | 32.655 | 79.685 | +47.030 | +144.02% |
+| `mlkem_pwm` | 108.878 | 114.232 | +5.354 | +4.92% |
+| `mldsa_ntt` | 140.159 | 106.959 | -33.200 | -23.69% |
+| `mldsa_intt` | 134.793 | 114.004 | -20.790 | -15.42% |
+| `mldsa_pwm` | 155.781 | 68.711 | -87.070 | -55.89% |
+
+Stage 3c interpretation:
+
+- Stage 3c did keep the ML-DSA benefit, and `mldsa_pwm` reached the lowest
+  observed value so far at 68.7.
+- The ML-KEM side still regressed badly, especially `mlkem_ntt`. This is the
+  key clue: ML-KEM invalid operands were zero in Stage 3c, so the regression
+  cannot be explained only by PRD being fed into ML-KEM arithmetic.
+- The remaining new switching source during ML-KEM is the free-running LFSR
+  itself. Because `blank_lfsr` advances every clock, Stage 3c still adds an
+  always-on public toggling source even in ML-KEM operations where PRD is not
+  used. That is not faithful to OpenTitan's operation-scoped PRD clearing model
+  and appears to be counterproductive for the ML-KEM traces.
+
+Next ablation:
+
+- Stage 3d: keep the Stage 3c hybrid input behavior, but advance the LFSR only
+  when an ML-DSA invalid-cycle flush is actually being emitted. This removes
+  the always-on PRD toggling from ML-KEM measurements while preserving the
+  ML-DSA flush mechanism.
