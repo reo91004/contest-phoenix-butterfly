@@ -24,6 +24,8 @@ module superbutterfly_sbu_ref (
     comp2_agile_modarith_div2 u_pre_sub (
         .a_i(b_i),
         .b_i(a_i),
+        .dummy_a_i(32'b0),
+        .dummy_b_i(32'b0),
         .opmode_i(opmode),
         .addsub_i(1'b1),
         .intt_i(1'b1),
@@ -60,6 +62,8 @@ module superbutterfly_sbu_ref (
     comp3_agile_modmul u_mul (
         .a_i(mul_a),
         .b_i(mul_b),
+        .dummy_a_i(32'b0),
+        .dummy_b_i(32'b0),
         .opmode_i(opmode),
         .c_o(prod)
     );

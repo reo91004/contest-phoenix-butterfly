@@ -8,11 +8,13 @@ TVLA가 어떻게 변했는지, 다시 이전 기준으로 어떻게 복구할 �
 
 ## 현재 RTL
 
-현재 active RTL은 **Stage 4b restored RTL**이다.
+현재 working tree의 active RTL은 **Stage 6c candidate**다. 다만 이 폴더의 Stage 1-6
+역사적 datapath blanking 결론에서 최종 선택됐던 기준점은 **Stage 4b restored RTL**이다.
 
 - original baseline이 아니다.
 - Stage 6b public PRD inactive-cone dummy가 아니다.
-- COMP3에는 `dummy_a_i/dummy_b_i` port가 없다.
+- 현재 source에는 Stage 4b 위에 COMP3 internal Stage 2와 COMP2 internal Stage 4 PRD
+  조합이 적용돼 있다.
 - Stage 4b에 남아 있는 핵심은 memory read-output zero blanking, ML-DSA invalid-cycle PRD flushing, COMP1/2/4 active unused-input zero blanking, ML-KEM INTT COMP4 exception이다.
 
 ## Stage별 결론
@@ -26,7 +28,11 @@ TVLA가 어떻게 변했는지, 다시 이전 기준으로 어떻게 복구할 �
 | `04_stage4.md` | active COMP1/2/4 blanking, Stage 4b exception | 현재 최종 선택 RTL |
 | `05_stage5.md` | Stage 4b 이후 small zero blanking 후보 | 모두 rejected |
 | `06_stage6.md` | COMP3 inactive-cone dummy 후보 | Stage 6b는 ML-KEM 힌트가 크지만 rejected |
-| `07_next_experiments.md` | Solinas/random dummy 후속 계획 | 먼저 COMP1/2/3/4 public dummy matrix 권장 |
+| `07_next_experiments.md` | Solinas/random dummy 후속 계획 | Solinas rejected, inactive dummy rejected, COMP2/COMP3 조합 Stage 6c candidate |
+
+후속 실행 원장은 `docs/experiments/inactive_dummy_matrix/README.md`,
+`docs/experiments/comp3_internal_dummy_matrix/README.md`,
+`docs/experiments/comp2_internal_dummy_matrix/README.md`에 둔다.
 
 ## 주요 TVLA 수치
 
@@ -40,7 +46,9 @@ TVLA가 어떻게 변했는지, 다시 이전 기준으로 어떻게 복구할 �
 | `mldsa_pwm` | 144.055 | 78.170 | 85.713 |
 
 Stage 6b는 ML-KEM 세 operation을 크게 낮췄지만 `mldsa_intt`와 `mldsa_pwm`을
-Stage 4b보다 악화시켰다. 따라서 최종 RTL은 Stage 4b다.
+Stage 4b보다 악화시켰다. 따라서 이 폴더의 원래 datapath blanking 흐름에서는 Stage 4b가
+최종 선택이었다. 이후 COMP3/COMP2 internal dummy matrix에서 Stage 6c candidate가 새
+best-so-far로 올라왔다.
 
 ## 그림
 

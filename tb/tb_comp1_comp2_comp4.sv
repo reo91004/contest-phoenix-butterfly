@@ -9,12 +9,21 @@ module tb_comp1_comp2_comp4;
     localparam integer KQ = 3329;
     localparam longint unsigned DQ = 64'd8380417;
     integer n, k, errors, checks;
-    reg  [31:0] a, b;
+    reg  [31:0] a, b, dummy_a, dummy_b;
     reg         opm, asb, itt;
     wire [31:0] c1, c2, c4;
 
     comp1_agile_modadd_div2 u1 (.a_i(a), .b_i(b), .opmode_i(opm), .intt_i(itt), .c_o(c1));
-    comp2_agile_modarith_div2 u2 (.a_i(a), .b_i(b), .opmode_i(opm), .addsub_i(asb), .intt_i(itt), .c_o(c2));
+    comp2_agile_modarith_div2 u2 (
+        .a_i(a),
+        .b_i(b),
+        .dummy_a_i(dummy_a),
+        .dummy_b_i(dummy_b),
+        .opmode_i(opm),
+        .addsub_i(asb),
+        .intt_i(itt),
+        .c_o(c2)
+    );
     comp4_agile_modarith u4 (.a_i(a), .b_i(b), .opmode_i(opm), .addsub_i(asb), .c_o(c4));
 
     function [15:0] kadd(input integer x, input integer y); kadd = (x + y) % KQ; endfunction
@@ -53,6 +62,8 @@ module tb_comp1_comp2_comp4;
         begin
             a = {ah, al};
             b = {bh, bl};
+            dummy_a = {$random, $random};
+            dummy_b = {$random, $random};
             opm = 0; asb = 0; itt = 0; #1; tally("kem_c1_add", c1, {kadd(ah,bh), kadd(al,bl)});
             opm = 0; asb = 0; itt = 1; #1; tally("kem_c1_add_d2", c1, {kd2(kadd(ah,bh)), kd2(kadd(al,bl))});
             opm = 0; asb = 0; itt = 0; #1; tally("kem_c2_add", c2, {kadd(ah,bh), kadd(al,bl)});
@@ -69,6 +80,8 @@ module tb_comp1_comp2_comp4;
         begin
             a = xa;
             b = xb;
+            dummy_a = {$random, $random};
+            dummy_b = {$random, $random};
             opm = 1; asb = 0; itt = 0; #1; tally("dsa_c1_add", c1, dadd(xa,xb));
             opm = 1; asb = 0; itt = 1; #1; tally("dsa_c1_add_d2", c1, dd2(dadd(xa,xb)));
             opm = 1; asb = 0; itt = 0; #1; tally("dsa_c2_add", c2, dadd(xa,xb));
@@ -88,6 +101,8 @@ module tb_comp1_comp2_comp4;
     initial begin
         errors = 0;
         checks = 0;
+        dummy_a = 32'b0;
+        dummy_b = 32'b0;
         if (!$value$plusargs("NRAND=%d", n)) n = 100000;
         $display("[tb_comp1_comp2_comp4] NRAND=%0d", n);
         run_kem(0,0,0,0);

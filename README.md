@@ -56,10 +56,13 @@ sca-2026-phoenix/
 │   │   ├── 01_stage1.md
 │   │   ├── 02_stage2.md
 │   │   ├── 03_stage3.md
-│   │   ├── 04_stage4.md           현재 RTL 기준 Stage 4b 설명
+│   │   ├── 04_stage4.md           Stage 6c의 기준점인 Stage 4b 설명
 │   │   ├── 05_stage5.md
 │   │   ├── 06_stage6.md
 │   │   └── 07_next_experiments.md
+│   ├── experiments/inactive_dummy_matrix/
+│   ├── experiments/comp3_internal_dummy_matrix/
+│   ├── experiments/comp2_internal_dummy_matrix/
 │   ├── implementation/            RTL migration 및 구현 배경
 │   ├── reference/                 논문 분석과 원 PHOENIX PDF
 │   └── archive/                   흡수된 초안과 full raw ledger

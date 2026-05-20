@@ -30,24 +30,34 @@ module superbutterfly_sbu_routed (
 );
     localparam [8:0] SEL_BLANK = `SBU_MOD_ADD;
     localparam       USE_PRD_INVALID_BLANKING = 1'b1;
+    localparam       USE_PRD_COMP3_INTERNAL_DUMMY = 1'b1;
 
     // Deterministic PRD source for invalid-cycle pipeline flushing. This is
     // public, unkeyed, and not a replacement for masking; it only prevents
     // invalid SBU stages from retaining the previous functional operands.
     reg [31:0] blank_lfsr;
+    reg [31:0] comp2_dummy_lfsr;
     wire blank_lfsr_fb = blank_lfsr[31] ^ blank_lfsr[21] ^ blank_lfsr[1] ^ blank_lfsr[0];
     wire [31:0] blank_lfsr_next = {blank_lfsr[30:0], blank_lfsr_fb};
+    wire comp2_dummy_fb = comp2_dummy_lfsr[31] ^ comp2_dummy_lfsr[21] ^ comp2_dummy_lfsr[1] ^ comp2_dummy_lfsr[0];
+    wire [31:0] comp2_dummy_next = {comp2_dummy_lfsr[30:0], comp2_dummy_fb};
     wire [31:0] blank_a = blank_lfsr;
     wire [31:0] blank_b = {blank_lfsr[15:0], blank_lfsr[31:16]} ^ 32'hA5A55A5A;
     wire [31:0] blank_c = {blank_lfsr[7:0], blank_lfsr[31:8]} ^ 32'h3C6EF372;
+    wire [31:0] comp2_dummy_a = comp2_dummy_lfsr;
+    wire [31:0] comp2_dummy_b = {comp2_dummy_lfsr[15:0], comp2_dummy_lfsr[31:16]} ^ 32'hC001CAFE;
     wire use_prd_candidate = `SBU_OPMODE(sel_i);
     wire use_prd_blank = USE_PRD_INVALID_BLANKING && !valid_i && use_prd_candidate;
 
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             blank_lfsr <= 32'h6D2B79F5;
+            comp2_dummy_lfsr <= 32'h1A2B3C4D;
         end else if (use_prd_blank) begin
             blank_lfsr <= blank_lfsr_next;
+            comp2_dummy_lfsr <= comp2_dummy_next;
+        end else if (valid_i) begin
+            comp2_dummy_lfsr <= comp2_dummy_next;
         end
     end
 
@@ -66,6 +76,30 @@ module superbutterfly_sbu_routed (
     end
     wire opmode1 = `SBU_OPMODE(sel1);
 
+    // Public dummy source for COMP3 internal inactive sub-cone experiments.
+    // Stage 2 of this matrix uses it only inside COMP3's inactive DSA
+    // Karatsuba cone during ML-KEM mode; active output paths stay real.
+    reg [31:0] comp3_internal_dummy_lfsr;
+    wire comp3_internal_dummy_fb = comp3_internal_dummy_lfsr[31] ^
+                                   comp3_internal_dummy_lfsr[22] ^
+                                   comp3_internal_dummy_lfsr[2] ^
+                                   comp3_internal_dummy_lfsr[1];
+    wire [31:0] comp3_internal_dummy_next =
+        {comp3_internal_dummy_lfsr[30:0], comp3_internal_dummy_fb};
+    wire [31:0] comp3_internal_dummy_a = USE_PRD_COMP3_INTERNAL_DUMMY ?
+                                         comp3_internal_dummy_lfsr : 32'b0;
+    wire [31:0] comp3_internal_dummy_b = USE_PRD_COMP3_INTERNAL_DUMMY ?
+                                         ({comp3_internal_dummy_lfsr[14:0],
+                                           comp3_internal_dummy_lfsr[31:15]} ^
+                                          32'hB4BCD35C) : 32'b0;
+    always @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            comp3_internal_dummy_lfsr <= 32'h243F6A88;
+        end else if (valid_i) begin
+            comp3_internal_dummy_lfsr <= comp3_internal_dummy_next;
+        end
+    end
+
     // ----- COMP2 (Phase A) : pre-multiply subtraction for inverse transforms -----
     reg [31:0] c2a, c2b; reg c2_sub, c2_intt;
     always @* begin
@@ -78,7 +112,9 @@ module superbutterfly_sbu_routed (
     end
     wire [31:0] comp2_y;
     comp2_agile_modarith_div2 u_comp2 (
-        .a_i(c2a), .b_i(c2b), .opmode_i(opmode1),
+        .a_i(c2a), .b_i(c2b),
+        .dummy_a_i(comp2_dummy_a), .dummy_b_i(comp2_dummy_b),
+        .opmode_i(opmode1),
         .addsub_i(c2_sub), .intt_i(c2_intt), .c_o(comp2_y)
     );
 
@@ -95,7 +131,14 @@ module superbutterfly_sbu_routed (
         endcase
     end
     wire [31:0] comp3_p;
-    comp3_agile_modmul u_comp3 (.a_i(mA), .b_i(mB), .opmode_i(opmode1), .c_o(comp3_p));
+    comp3_agile_modmul u_comp3 (
+        .a_i(mA),
+        .b_i(mB),
+        .dummy_a_i(comp3_internal_dummy_a),
+        .dummy_b_i(comp3_internal_dummy_b),
+        .opmode_i(opmode1),
+        .c_o(comp3_p)
+    );
 
     // ===== s2: COMP3/COMP2 결과 + 데이터 정렬 레지스터 =====
     reg [31:0] p2,q2,a2,b2,c2; reg [8:0] sel2; reg v2;

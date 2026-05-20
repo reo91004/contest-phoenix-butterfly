@@ -52,6 +52,22 @@ synth/synth_dsp_result*.txt
 
 # Evaluation artifacts are regenerable in the post-RTL phase.
 /reports/*
+/reports/tvla/*
+!/reports/tvla/
+
+# Keep only the TVLA figures embedded in the final COMP3 Stage 2 report.
+!/reports/tvla/mlkem_mldsa_secretdist_20260519_cw305_husky_1000/
+/reports/tvla/mlkem_mldsa_secretdist_20260519_cw305_husky_1000/*
+!/reports/tvla/mlkem_mldsa_secretdist_20260519_cw305_husky_1000/mlkem_mldsa_tvla_overview.png
+
+!/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/
+/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/*
+!/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/mlkem_mldsa_tvla_overview.png
+!/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_original_baseline.png
+
+!/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/
+/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/*
+!/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/mlkem_mldsa_tvla_overview.png
 /tb/vectors/
 *.dcp
 

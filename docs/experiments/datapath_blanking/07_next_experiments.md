@@ -7,6 +7,24 @@ Stage 6b가 ML-KEM에서 매우 좋은 결과를 냈기 때문에 두 질문이 
 1. ML-DSA Montgomery reduction을 Solinas-style reduction으로 바꾸면 ML-DSA도 좋아질까?
 2. COMP1/2/3/4 모두에 public random dummy를 넣어보는 실험은 의미가 있을까?
 
+## 2026-05-21 업데이트
+
+두 질문 모두 실제로 분리 실험했다.
+
+- Solinas-style ML-DSA arithmetic baseline은 기능/timing은 통과했지만 TVLA worst를
+  악화시켜 rejected/informative로 보존했다. 상세는
+  `docs/handover/260521_mldsa_solinas_stage7_plan.md`에 둔다.
+- COMP1/2/3/4 inactive/unused public PRD dummy matrix는 Stage 4b restored RTL에서
+  다시 실행했다. 상세는 `docs/experiments/inactive_dummy_matrix/README.md`에 둔다.
+- matrix 결론은 "일부 operation은 낮아지지만 six-op worst가 함께 내려가는 accepted
+  후보는 없음"이다.
+- 이후 COMP3/COMP2 내부 inactive cone을 더 좁게 쪼갠 matrix를 추가로 실행했다. 상세는
+  `docs/experiments/comp3_internal_dummy_matrix/README.md`와
+  `docs/experiments/comp2_internal_dummy_matrix/README.md`에 둔다.
+- 현재 best-so-far는 Stage 6c candidate다. Stage 4b control 대비 worst를
+  `mldsa_intt 122.083 -> 99.696`, repeat에서 `102.864`까지 낮췄지만, `mlkem_intt`
+  악화가 남아 final accepted는 아니다.
+
 ## 현재 해석
 
 Stage 6b는 active arithmetic을 바꾼 실험이 아니다. ML-KEM mode에서는 active KEM
@@ -43,7 +61,7 @@ inactive cone과는 실험 범주가 다르다. 더 작은 reducer가 TVLA를 �
 - 먼저 inactive/unused public dummy switching 효과를 COMP1/2/3/4 전체에서
   체계적으로 분해해야 한다.
 
-## Stage 7 제안: COMP1/2/3/4 public dummy matrix
+## 실행된 matrix: COMP1/2/3/4 public dummy
 
 기준은 반드시 Stage 4b다. Stage 6b 위에 쌓지 않는다.
 
@@ -57,7 +75,7 @@ inactive cone과는 실험 범주가 다르다. 더 작은 reducer가 TVLA를 �
 - active arithmetic cone에는 dummy를 섞지 않음.
 - dummy는 secret, fixed/random class, memory contents와 독립.
 
-### Stage 7a: peak-to-cycle mapping
+### Peak-to-cycle mapping
 
 RTL 변경 없이 먼저 한다.
 
@@ -65,22 +83,22 @@ RTL 변경 없이 먼저 한다.
 - Stage 4b `mlkem_pwm` peak index 63도 함께 매핑.
 - COMP1/2/3/4 중 어느 block이 해당 window에 있는지 VCD/SAIF 또는 debug trace로 확인.
 
-### Stage 7b: COMP2 unused-input PRD dummy
+### COMP2 unused-input PRD dummy
 
 Stage 4b에서 COMP2는 INTT가 아닐 때 input이 zero다. 이 zero 대신 valid-cycle
 public PRD dummy를 넣어 NTT/PWM active peak가 낮아지는지 본다.
 
-### Stage 7c: COMP4 unused-input PRD dummy
+### COMP4 unused-input PRD dummy
 
 Stage 4b에서 COMP4는 NTT, ML-KEM INTT exception, PWM1에서만 real input을 받는다.
 나머지 valid cycle에 public PRD dummy를 넣는다. ML-KEM INTT exception은 유지한다.
 
-### Stage 7d: COMP1 unused-input PRD dummy
+### COMP1 unused-input PRD dummy
 
 output mux가 COMP1을 쓰지 않는 valid cycle에만 COMP1 input을 public PRD dummy로
 바꾼다. 특히 ML-DSA PWM 주변 leakage shape를 본다.
 
-### Stage 7e: COMP3 inactive-cone PRD dummy v2
+### COMP3 inactive-cone PRD dummy v2
 
 Stage 6b를 다시 하되 control을 더 명확히 둔다.
 
@@ -88,10 +106,10 @@ Stage 6b를 다시 하되 control을 더 명확히 둔다.
 - ML-DSA mode: active DSA cone real, inactive KEM cone PRD dummy.
 - PRD LFSR advance는 valid COMP3 transaction에만 제한.
 
-## Stage 8 제안: ML-DSA Solinas-style reducer
+## Solinas-style reducer 결과
 
-Stage 7 이후에도 `mldsa_intt` peak 123이 남으면 Stage 8에서 ML-DSA active reducer를
-바꿔 본다.
+ML-DSA active reducer 변경은 별도 Solinas baseline으로 실제 구현해 측정했다. 결과는
+rejected/informative다.
 
 조건:
 
@@ -102,8 +120,9 @@ Stage 7 이후에도 `mldsa_intt` peak 123이 남으면 Stage 8에서 ML-DSA act
 - cycle count 유지.
 - Montgomery-domain convention과 golden model equivalence를 먼저 확인.
 
-만약 Montgomery-domain 자체를 버리고 canonical/Solinas domain으로 옮긴다면, 그것은
-blanking 실험이 아니라 arithmetic representation migration이다.
+Montgomery-domain 자체를 버리고 canonical/Solinas domain으로 옮기는 것은 blanking
+실험이 아니라 arithmetic representation migration이며, 이번 결과는 그 migration만으로
+TVLA pass 방향이 자동으로 열리지 않음을 보여준다.
 
 ## Decision rule
 
@@ -114,7 +133,8 @@ blanking 실험이 아니라 arithmetic representation migration이다.
 
 ## 최종 권고
 
-Stage 6b 결과는 버리기 아깝다. 하지만 그 결과는 Solinas-style reducer의 성공
-증거가 아니라 inactive public dummy switching이 TVLA shape를 크게 바꿀 수 있다는
-증거다. 따라서 다음 순서는 `peak mapping -> COMP1/2/3/4 public dummy matrix ->
-Solinas-style reducer`가 가장 안전하다.
+Stage 6b 결과는 여전히 중요한 관찰이다. 하지만 후속 matrix와 Solinas branch까지 보면,
+현재 범위의 inactive public dummy switching이나 arithmetic baseline 교체만으로
+six-op TVLA pass 후보가 나오지는 않았다. 다음 큰 방향은 `mldsa_intt` peak 123과
+`mlkem_pwm` peak 63을 cycle/net 단위로 더 좁히거나, 더 큰 범주의 masking/shuffling
+설계를 별도 계획으로 분리하는 것이다.
