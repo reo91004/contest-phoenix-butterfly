@@ -3,7 +3,7 @@
 날짜: 2026-05-19 KST
 
 이 문서는 ML-KEM / ML-DSA 리팩터에 필요한 PHOENIX 논문의 근거를 정리한다.
-원 논문 PDF는 `docs/[eprint25]_PHOENIX MLKEM and HQC.pdf`에 보관한다.
+원 논문 PDF는 `docs/reference/[eprint25]_PHOENIX MLKEM and HQC.pdf`에 보관한다.
 
 ## 원 PHOENIX의 핵심 구조
 

@@ -48,11 +48,21 @@ ML-DSA의 세 파라미터 세트는 이 연산기에서 사용하는 primitive 
 ```text
 sca-2026-phoenix/
 ├── docs/
-│   ├── phoenix_paper_analysis.md
-│   ├── mlkem_mldsa_refactor_plan.md
-│   ├── migration_log.md
-│   ├── extensions/mldsa_comp3_idea.md
-│   └── 원 PHOENIX 논문 PDF
+│   ├── README.md
+│   ├── handover/                  인수인계 및 실행 계획
+│   ├── experiments/datapath_blanking/
+│   │   ├── README.md              SCA 실험 요약
+│   │   ├── 00_baseline.md
+│   │   ├── 01_stage1.md
+│   │   ├── 02_stage2.md
+│   │   ├── 03_stage3.md
+│   │   ├── 04_stage4.md           현재 RTL 기준 Stage 4b 설명
+│   │   ├── 05_stage5.md
+│   │   ├── 06_stage6.md
+│   │   └── 07_next_experiments.md
+│   ├── implementation/            RTL migration 및 구현 배경
+│   ├── reference/                 논문 분석과 원 PHOENIX PDF
+│   └── archive/                   흡수된 초안과 full raw ledger
 ├── rtl/
 │   ├── common/   공통 상수, 카운터, 설정
 │   ├── arith/    ML-KEM 및 ML-DSA modular add/sub/div2

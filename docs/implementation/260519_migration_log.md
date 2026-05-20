@@ -82,15 +82,18 @@ verilator --lint-only -sv -Wno-fatal -Irtl/common \
 
 문서 audit:
 
-- `docs/`에는 활성 planning/progress note와 원 논문 PDF만 남긴다.
-  - `docs/phoenix_paper_analysis.md`
-  - `docs/mlkem_mldsa_refactor_plan.md`
-  - `docs/migration_log.md`
-  - `docs/extensions/mldsa_comp3_idea.md`
-  - 원 PHOENIX 논문 PDF
+- 현재 읽어야 할 문서 흐름은 `docs/README.md`에 정리했다.
+- 활성 근거/진행 문서는 다음 구조로 재배치했다.
+  - `docs/reference/260519_phoenix_paper_analysis.md`
+  - `docs/implementation/260519_migration_log.md`
+  - `docs/experiments/datapath_blanking/README.md`
+  - `docs/experiments/datapath_blanking/04_stage4.md`
+  - `docs/experiments/datapath_blanking/07_next_experiments.md`
+  - `docs/reference/[eprint25]_PHOENIX MLKEM and HQC.pdf`
+- 초기 planning 성격 문서와 분할 전 full ledger는 삭제하지 않고
+  `docs/archive/`로 보존했다.
 - 예전 transfer note, presentation, report, LaTeX, 비활성 capture,
   비활성 experiment file은 제거된 상태다.
-- 남은 `docs/` file은 모두 현재 설계 근거 또는 진행 기록으로 필요하다.
 
 정합성 근거:
 
