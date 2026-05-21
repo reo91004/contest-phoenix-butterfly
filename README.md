@@ -56,10 +56,12 @@ sca-2026-phoenix/
 │   │   ├── 01_stage1.md
 │   │   ├── 02_stage2.md
 │   │   ├── 03_stage3.md
-│   │   ├── 04_stage4.md           Stage 6c의 기준점인 Stage 4b 설명
+│   │   ├── 04_stage4.md           COMP3 Stage 2의 이전 datapath blanking 기준 설명
 │   │   ├── 05_stage5.md
 │   │   ├── 06_stage6.md
 │   │   └── 07_next_experiments.md
+│   ├── experiments/stage2_dsa_mul_only_prd.md
+│   │                                현재 논문 후보 RTL 최종 보고서
 │   ├── experiments/inactive_dummy_matrix/
 │   ├── experiments/comp3_internal_dummy_matrix/
 │   ├── experiments/comp2_internal_dummy_matrix/

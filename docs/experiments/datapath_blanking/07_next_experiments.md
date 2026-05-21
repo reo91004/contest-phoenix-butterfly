@@ -21,9 +21,10 @@ Stage 6b가 ML-KEM에서 매우 좋은 결과를 냈기 때문에 두 질문이 
 - 이후 COMP3/COMP2 내부 inactive cone을 더 좁게 쪼갠 matrix를 추가로 실행했다. 상세는
   `docs/experiments/comp3_internal_dummy_matrix/README.md`와
   `docs/experiments/comp2_internal_dummy_matrix/README.md`에 둔다.
-- 현재 best-so-far는 Stage 6c candidate다. Stage 4b control 대비 worst를
-  `mldsa_intt 122.083 -> 99.696`, repeat에서 `102.864`까지 낮췄지만, `mlkem_intt`
-  악화가 남아 final accepted는 아니다.
+- 논문 후보 RTL은 COMP3 internal Stage 2 `DSA Karatsuba-only PRD in ML-KEM mode`로
+  정했다. Original baseline 대비 six-op max `|t|`가 모두 낮아졌기 때문이다.
+- Stage 6c candidate는 Stage 4b control 대비 worst를 `mldsa_intt 122.083 -> 99.696`,
+  repeat에서 `102.864`까지 낮췄지만, `mlkem_intt` 악화가 남아 final RTL에는 적용하지 않는다.
 
 ## 현재 해석
 

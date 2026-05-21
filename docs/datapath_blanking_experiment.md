@@ -8,10 +8,11 @@
 - COMP2 internal dummy matrix: `docs/experiments/comp2_internal_dummy_matrix/README.md`
 - 원본 full ledger 보존본: `docs/archive/260521_datapath_blanking_experiment_full_ledger.md`
 
-현재 working tree의 active RTL은 Stage 6c candidate다.
+현재 working tree의 active RTL은 COMP3 internal Stage 2 `DSA Karatsuba-only PRD in
+ML-KEM mode` 논문 후보다.
 
-- 기준: Stage 4b restored RTL
-- 추가 적용: COMP3 internal Stage 2 `DSA Karatsuba-only PRD`
-- 추가 적용: COMP2 internal Stage 4 `KEM cone PRD in ML-DSA mode`
-- 현재 best-so-far 결과: `docs/experiments/comp2_internal_dummy_matrix/stage6_combined_accepted.md`
-- Stage 4b restored RTL로 복구하려면 RTL/testbench 변경을 `git restore`로 제거한다.
+- 적용 내용: COMP1/2/4 unused input zero blanking 유지.
+- 추가 적용: ML-KEM mode에서 COMP3 내부 inactive DSA Karatsuba 입력에 public PRD.
+- 추가 적용: 같은 ML-KEM mode에서 inactive DSA Montgomery reducer 입력은 `0`.
+- 적용하지 않음: COMP2 internal Stage 4 `KEM cone PRD in ML-DSA mode`.
+- 현재 RTL 상세: `docs/experiments/stage2_dsa_mul_only_prd.md`

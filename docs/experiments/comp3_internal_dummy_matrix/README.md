@@ -29,7 +29,7 @@ DSA Karatsuba, DSA Montgomery reducer, KEM lo/hi multiplier, KEM Barrett reducer
 | 문서 | 실험 | 상태 |
 |---|---|---|
 | `stage1_control.md` | Stage 4b control alias | 기존 control 재사용 |
-| `stage2_dsa_mul_only_prd.md` | ML-KEM mode에서 inactive DSA Karatsuba만 PRD, DSA reducer는 zero | accepted 후보, repeat 재현 |
+| [`../stage2_dsa_mul_only_prd.md`](../stage2_dsa_mul_only_prd.md) | ML-KEM mode에서 inactive DSA Karatsuba만 PRD, DSA reducer는 zero | accepted 후보, repeat 재현 |
 | `stage3_dsa_reducer_only_prd.md` | ML-KEM mode에서 inactive DSA reducer만 PRD, DSA Karatsuba는 zero | timing reject |
 | `stage4_dsa_mul_to_reducer_prd.md` | ML-KEM mode에서 inactive DSA Karatsuba PRD 결과를 reducer까지 전파 | rejected, ML-KEM 매우 개선 / ML-DSA INTT 악화 |
 | `stage5_kem_lo_lane_prd.md` | ML-DSA mode에서 inactive KEM lo lane만 PRD | rejected, ML-DSA INTT 및 ML-KEM 악화 |

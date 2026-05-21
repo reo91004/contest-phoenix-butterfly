@@ -335,15 +335,15 @@ ML-DSA reducer 입력은 0으로 막는다.
   - `tb_phoenix_mldsa_pwm_io`
   - 결과: PASS, `tb_phoenix_mldsa_pwm_io cycles=140`
 - Vivado 30ns build:
-  - bitstream mtime: `2026-05-21 03:31:53 KST`
+  - bitstream mtime: `2026-05-21 11:15:47 KST`
   - WNS/TNS: `0.113 ns / 0.000 ns`
   - WHS/THS: `0.056 ns / 0.000 ns`
   - LUT/FF/RAMB36/DSP: `9977 / 3350 / 8 / 0`
 - artifact:
-  - `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd.bit`
-  - `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd_timing.rpt`
-  - `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd_impl_util.rpt`
-  - `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/rtl_stage2_dsa_mul_only_prd.patch`
+  - `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd.bit`
+  - `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd_timing.rpt`
+  - `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/phoenix_comp3_stage2_dsa_mul_only_prd_impl_util.rpt`
+  - `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/rtl_stage2_dsa_mul_only_prd.patch`
 
 ## TVLA 결과
 
@@ -368,11 +368,11 @@ bash scripts/tvla/run_mlkem_mldsa_1000.sh
 
 Original baseline TVLA overview:
 
-![Original baseline TVLA overview](../../../reports/tvla/mlkem_mldsa_secretdist_20260519_cw305_husky_1000/mlkem_mldsa_tvla_overview.png)
+![Original baseline TVLA overview](../../reports/tvla/mlkem_mldsa_secretdist_20260519_cw305_husky_1000/mlkem_mldsa_tvla_overview.png)
 
 Stage 2 TVLA overview:
 
-![Stage 2 TVLA overview](../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/mlkem_mldsa_tvla_overview.png)
+![Stage 2 TVLA overview](../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/mlkem_mldsa_tvla_overview.png)
 
 Original baseline 직접 비교:
 
@@ -385,12 +385,12 @@ Original baseline 직접 비교:
 | `mldsa_intt` | 135.012 | 117.028 | -13.32% |
 | `mldsa_pwm` | 144.055 | 71.047 | -50.68% |
 
-![Stage 2 vs original baseline](../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_original_baseline.png)
+![Stage 2 vs original baseline](../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_original_baseline.png)
 
 비교 artifact:
 
-- `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_original_baseline.png`
-- `../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_comp3_whole_cone_prd.png`
+- `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_original_baseline.png`
+- `../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_260521/comparison_vs_comp3_whole_cone_prd.png`
 
 Key repeat:
 
@@ -408,7 +408,7 @@ bash scripts/tvla/run_mlkem_mldsa_1000.sh
 | `mldsa_intt` | 113.569 | 123 | 538 | 0 |
 | `mldsa_pwm` | 72.984 | 114 | 140 | 0 |
 
-![Stage 2 key repeat overview](../../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/mlkem_mldsa_tvla_overview.png)
+![Stage 2 key repeat overview](../../reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/mlkem_mldsa_tvla_overview.png)
 
 ## 판단
 

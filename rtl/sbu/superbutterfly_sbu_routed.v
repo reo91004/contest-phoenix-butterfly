@@ -36,28 +36,19 @@ module superbutterfly_sbu_routed (
     // public, unkeyed, and not a replacement for masking; it only prevents
     // invalid SBU stages from retaining the previous functional operands.
     reg [31:0] blank_lfsr;
-    reg [31:0] comp2_dummy_lfsr;
     wire blank_lfsr_fb = blank_lfsr[31] ^ blank_lfsr[21] ^ blank_lfsr[1] ^ blank_lfsr[0];
     wire [31:0] blank_lfsr_next = {blank_lfsr[30:0], blank_lfsr_fb};
-    wire comp2_dummy_fb = comp2_dummy_lfsr[31] ^ comp2_dummy_lfsr[21] ^ comp2_dummy_lfsr[1] ^ comp2_dummy_lfsr[0];
-    wire [31:0] comp2_dummy_next = {comp2_dummy_lfsr[30:0], comp2_dummy_fb};
     wire [31:0] blank_a = blank_lfsr;
     wire [31:0] blank_b = {blank_lfsr[15:0], blank_lfsr[31:16]} ^ 32'hA5A55A5A;
     wire [31:0] blank_c = {blank_lfsr[7:0], blank_lfsr[31:8]} ^ 32'h3C6EF372;
-    wire [31:0] comp2_dummy_a = comp2_dummy_lfsr;
-    wire [31:0] comp2_dummy_b = {comp2_dummy_lfsr[15:0], comp2_dummy_lfsr[31:16]} ^ 32'hC001CAFE;
     wire use_prd_candidate = `SBU_OPMODE(sel_i);
     wire use_prd_blank = USE_PRD_INVALID_BLANKING && !valid_i && use_prd_candidate;
 
     always @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             blank_lfsr <= 32'h6D2B79F5;
-            comp2_dummy_lfsr <= 32'h1A2B3C4D;
         end else if (use_prd_blank) begin
             blank_lfsr <= blank_lfsr_next;
-            comp2_dummy_lfsr <= comp2_dummy_next;
-        end else if (valid_i) begin
-            comp2_dummy_lfsr <= comp2_dummy_next;
         end
     end
 
@@ -113,7 +104,6 @@ module superbutterfly_sbu_routed (
     wire [31:0] comp2_y;
     comp2_agile_modarith_div2 u_comp2 (
         .a_i(c2a), .b_i(c2b),
-        .dummy_a_i(comp2_dummy_a), .dummy_b_i(comp2_dummy_b),
         .opmode_i(opmode1),
         .addsub_i(c2_sub), .intt_i(c2_intt), .c_o(comp2_y)
     );

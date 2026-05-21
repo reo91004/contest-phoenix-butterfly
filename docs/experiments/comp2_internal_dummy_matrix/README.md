@@ -22,7 +22,8 @@ ML-KEM/ML-DSA 전체 worst를 낮출 수 있는가?
 
 - Stage 2-6b의 단독 COMP2 실험 기준은 Stage 4b restored RTL이다.
 - Stage 6c 이후 조합 실험은 COMP3 internal Stage 2 candidate 위에서 수행했다.
-- 현재 working tree에는 Stage 6c candidate가 적용돼 있다.
+- 현재 working tree에는 Stage 6c가 아니라 COMP3 internal Stage 2 단독 논문 후보가 적용돼
+  있다. Stage 6c는 결과 보존용 조합 후보로 남긴다.
 - active architectural output으로 선택되는 계산값에는 dummy를 섞지 않는다.
 - SBU latency 8, scheduler, memory layout, cycle count, DSP 0 목표는 유지한다.
 
@@ -221,11 +222,11 @@ Stage 6e는 COMP3 Stage 2 위에 COMP2 Stage 5 all-DSA zero를 얹었다. 기능
 따라서 TVLA는 실행하지 않았다. all-DSA zero는 Stage 5 단독 결과에서도 TVLA trade-off가
 컸고, COMP3 Stage 2와 조합하면 timing까지 깨진다.
 
-## 현재 best-so-far
+## 보존된 best-worst 후보
 
-현재까지의 best-so-far는 Stage 6c다. Stage 4b control 대비 six-op worst를
+COMP2 matrix에서 worst만 보면 가장 낮았던 후보는 Stage 6c다. Stage 4b control 대비 six-op worst를
 `122.083 -> 99.696`, repeat에서 `102.864`까지 낮췄다. 하지만 `mlkem_intt` 악화가
-남아 final accepted RTL보다는 candidate로 둔다.
+남아 현재 논문 RTL에는 적용하지 않는다.
 
 ## 공통 실행 명령
 
