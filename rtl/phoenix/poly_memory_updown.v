@@ -27,7 +27,6 @@ module poly_memory_updown #(
     input  wire                clk,
 
     // memory-up: 4 banks, port-a (read) + port-b (write)
-    input  wire [3:0]              mu_a_en,
     input  wire [3:0]              mu_a_we,
     input  wire [4*ADDR_W-1:0]     mu_a_addr,
     input  wire [4*DATA_W-1:0]     mu_a_din,
@@ -38,7 +37,6 @@ module poly_memory_updown #(
     input  wire [4*DATA_W-1:0]     mu_b_din,
 
     // memory-down: 4 banks, port-a (read) + port-b (write)
-    input  wire [3:0]              md_a_en,
     input  wire [3:0]              md_a_we,
     input  wire [4*ADDR_W-1:0]     md_a_addr,
     input  wire [4*DATA_W-1:0]     md_a_din,
@@ -54,7 +52,6 @@ module poly_memory_updown #(
         for (gi = 0; gi < 4; gi = gi + 1) begin : g_mu
             bram_dp #(.DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_mu (
                 .clk    (clk),
-                .a_en   (mu_a_en[gi]),
                 .a_we   (mu_a_we[gi]),
                 .a_addr (mu_a_addr[(gi+1)*ADDR_W-1 -: ADDR_W]),
                 .a_din  (mu_a_din [(gi+1)*DATA_W-1 -: DATA_W]),
@@ -67,7 +64,6 @@ module poly_memory_updown #(
         for (gi = 0; gi < 4; gi = gi + 1) begin : g_md
             bram_dp #(.DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_md (
                 .clk    (clk),
-                .a_en   (md_a_en[gi]),
                 .a_we   (md_a_we[gi]),
                 .a_addr (md_a_addr[(gi+1)*ADDR_W-1 -: ADDR_W]),
                 .a_din  (md_a_din [(gi+1)*DATA_W-1 -: DATA_W]),
@@ -87,9 +83,9 @@ endmodule
 //
 // PHOENIX's conflict-free scheduler and delayed write-back avoid read-after-write
 // hazards at the algorithm level, so same-cycle write-through is not required.
-// Keeping the BRAM ports as synchronous reads with a plain output enable avoids
-// per-bit bypass muxes and matches the paper Table 7 accounting where Polynomial
-// Memories are BRAMs, not LUT datapath.
+// Keeping the BRAM ports as plain synchronous reads avoids per-bit bypass muxes
+// and matches the paper Table 7 accounting where Polynomial Memories are BRAMs,
+// not LUT datapath.
 // Vivado infers BRAM when DEPTH * DATA_W is large enough.
 // -----------------------------------------------------------------------------
 module bram_dp #(
@@ -97,7 +93,6 @@ module bram_dp #(
     parameter integer ADDR_W = 10
 )(
     input  wire                clk,
-    input  wire                a_en,
     input  wire                a_we,
     input  wire [ADDR_W-1:0]   a_addr,
     input  wire [DATA_W-1:0]   a_din,
@@ -116,7 +111,7 @@ module bram_dp #(
 
     always @(posedge clk) begin
         if (a_we) mem[a_addr] <= a_din;
-        a_dout <= a_en ? mem[a_addr] : {DATA_W{1'b0}};
+        a_dout <= mem[a_addr];
     end
     always @(posedge clk) begin
         if (b_we) mem[b_addr] <= b_din;

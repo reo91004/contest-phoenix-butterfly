@@ -48,7 +48,6 @@ report_timing_summary -file reports/phoenix_synth_timing.rpt
 opt_design
 place_design -directive ExtraTimingOpt
 route_design -directive NoTimingRelaxation
-phys_opt_design -directive AggressiveExplore
 
 report_utilization -file reports/phoenix_impl_util.rpt
 report_utilization -hierarchical -file reports/phoenix_impl_hier_util.rpt

@@ -18,8 +18,6 @@ PYTHON="${PYTHON:-python}"
 SECRET_DIST="${SECRET_DIST:-auto}"
 MLKEM_ETA="${MLKEM_ETA:-2}"
 MLDSA_ETA="${MLDSA_ETA:-2}"
-TRACE_ORDER="${TRACE_ORDER:-paired}"
-ORDER_SEED="${ORDER_SEED:-0x5EED}"
 
 mkdir -p "$OUTDIR"
 [ -s "$LOG" ] && printf '\n' >> "$LOG"
@@ -28,7 +26,6 @@ echo "================ session $(date '+%Y-%m-%d %H:%M:%S') ================" | 
 echo "run_mlkem_mldsa_1000.sh start $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$LOG"
 echo "fixed-mode=secret secret-dist=$SECRET_DIST traces/group=$TRACES ops=[$OPS]" | tee -a "$LOG"
 echo "mlkem-eta=$MLKEM_ETA mldsa-eta=$MLDSA_ETA" | tee -a "$LOG"
-echo "trace-order=$TRACE_ORDER order-seed=$ORDER_SEED" | tee -a "$LOG"
 echo "DUT bitstream: $BITFILE" | tee -a "$LOG"
 if [ ! -f "$BITFILE" ]; then
     echo "[FAIL] missing bitstream: $BITFILE" | tee -a "$LOG"
@@ -76,8 +73,6 @@ for OP in $OPS; do
         --words-per-slot "$WORDS" \
         --samples "$SAMP" \
         --gain-db 10 \
-        --trace-order "$TRACE_ORDER" \
-        --order-seed "$ORDER_SEED" \
         --bitfile "$BITFILE" \
         --out "$OUT" >> "$LOG" 2>&1; then
         grep -E '^\[TVLA\] (fixed-mode|operation|max_abs_t|RESULT)' "$LOG" | tail -4 | tee -a "$LOG"

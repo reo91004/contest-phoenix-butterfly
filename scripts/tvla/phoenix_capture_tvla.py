@@ -54,54 +54,6 @@ def pack_mlkem_word(lo: int, hi: int) -> int:
     return ((hi % KEM_Q) << 16) | (lo % KEM_Q)
 
 
-def unpack_mlkem_word(word: int) -> tuple[int, int]:
-    return int(word) & 0xFFFF, (int(word) >> 16) & 0xFFFF
-
-
-def split_mlkem_word(word: int, randbelow) -> tuple[int, int]:
-    lo, hi = unpack_mlkem_word(word)
-    lo_m = randbelow(KEM_Q)
-    hi_m = randbelow(KEM_Q)
-    share1 = pack_mlkem_word(lo_m, hi_m)
-    share0 = pack_mlkem_word((lo - lo_m) % KEM_Q, (hi - hi_m) % KEM_Q)
-    return share0, share1
-
-
-def split_mlkem_words(words: list[int], randbelow=secrets.randbelow) -> tuple[list[int], list[int]]:
-    share0: list[int] = []
-    share1: list[int] = []
-    for word in words:
-        s0, s1 = split_mlkem_word(word, randbelow)
-        share0.append(s0)
-        share1.append(s1)
-    return share0, share1
-
-
-def split_mldsa_word(word: int, randbelow) -> tuple[int, int]:
-    value = int(word) % MLDSA_Q
-    share1 = randbelow(MLDSA_Q)
-    share0 = (value - share1) % MLDSA_Q
-    return share0, share1
-
-
-def split_mldsa_words(words: list[int], randbelow=secrets.randbelow) -> tuple[list[int], list[int]]:
-    share0: list[int] = []
-    share1: list[int] = []
-    for word in words:
-        s0, s1 = split_mldsa_word(word, randbelow)
-        share0.append(s0)
-        share1.append(s1)
-    return share0, share1
-
-
-def mlkem_random_tape_words(count: int, randbelow=secrets.randbelow) -> list[int]:
-    return [pack_mlkem_word(randbelow(KEM_Q), randbelow(KEM_Q)) for _ in range(count)]
-
-
-def mldsa_random_tape_words(count: int, randbelow=secrets.randbelow) -> list[int]:
-    return [randbelow(MLDSA_Q) for _ in range(count)]
-
-
 def mldsa_to_mont(x: int) -> int:
     return ((x % MLDSA_Q) * MLDSA_R_MOD_Q) % MLDSA_Q
 
@@ -245,7 +197,6 @@ def load_group(
     secret_dist: str,
     mlkem_eta: int,
     mldsa_eta: int,
-    mask_shares: bool,
 ) -> None:
     if fixed:
         if fixed_mode == "secret":
@@ -262,26 +213,8 @@ def load_group(
             slot: random_words(words_per_slot, operation, secret_dist, mlkem_eta, mldsa_eta)
             for slot in slots
         }
-    if mask_shares and is_mlkem_operation(operation):
-        for slot in slots:
-            share0, share1 = split_mlkem_words(data_map[slot])
-            dut.load_region_words(0, slot, share0)
-            dut.load_region_words(1, slot, share1)
-        # Random tape region: slots 0..3 are consumed through memory-up, slots
-        # 4..7 through memory-down. Loading the selected TVLA slots keeps NTT
-        # and INTT harmless while giving PWM fresh host-provided r values.
-        for slot in slots:
-            dut.load_region_words(2, slot, mlkem_random_tape_words(words_per_slot))
-    elif mask_shares and is_mldsa_operation(operation):
-        for slot in slots:
-            share0, share1 = split_mldsa_words(data_map[slot])
-            dut.load_region_words(0, slot, share0)
-            dut.load_region_words(1, slot, share1)
-        for slot in slots:
-            dut.load_region_words(2, slot, mldsa_random_tape_words(words_per_slot))
-    else:
-        for slot in slots:
-            dut.load_slot_words(slot, data_map[slot])
+    for slot in slots:
+        dut.load_slot_words(slot, data_map[slot])
 
 
 def describe_distribution(operation: str, secret_dist: str, mlkem_eta: int, mldsa_eta: int) -> str:
@@ -413,28 +346,6 @@ def main() -> int:
     parser.add_argument("--pll-freq", type=float, default=33.333e6)
     parser.add_argument("--adc-mul", type=int, default=1)
     parser.add_argument("--threshold", type=float, default=4.5)
-    parser.add_argument(
-        "--disable-mlkem-masking-preload",
-        action="store_true",
-        help="Backward-compatible alias for --disable-masking-preload.",
-    )
-    parser.add_argument(
-        "--disable-masking-preload",
-        action="store_true",
-        help="Do not split ML-KEM/ML-DSA operands into share0/share1 or preload random tape.",
-    )
-    parser.add_argument(
-        "--trace-order",
-        choices=["paired", "shuffle"],
-        default="paired",
-        help="paired: fixed then random per iteration; shuffle: balanced randomized fixed/random order.",
-    )
-    parser.add_argument(
-        "--order-seed",
-        type=lambda x: int(x, 0),
-        default=0x5EED,
-        help="Seed for --trace-order shuffle; ignored by paired order.",
-    )
     parser.add_argument("--out", type=Path, default=Path("reports/tvla/phoenix_tvla.npz"))
     parser.add_argument("--no-force", action="store_true")
     args = parser.parse_args()
@@ -442,9 +353,6 @@ def main() -> int:
     slots = parse_slots(args.slots)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     secret_dist = resolve_secret_dist(args.secret_dist, args.operation)
-    mask_preload_disabled = args.disable_masking_preload or args.disable_mlkem_masking_preload
-    masked_operation = is_mlkem_operation(args.operation) or is_mldsa_operation(args.operation)
-    mask_shares = masked_operation and not mask_preload_disabled
     dist_description = describe_distribution(
         args.operation,
         secret_dist,
@@ -501,28 +409,15 @@ def main() -> int:
         print(
             f"[TVLA] operation={args.operation} instr=0x{INSTR[args.operation]:03x} "
             f"traces/group={args.traces} slots={slots} words/slot={args.words_per_slot} "
-            f"samples={args.samples} secret-dist={secret_dist} trace-order={args.trace_order}"
+            f"samples={args.samples} secret-dist={secret_dist}"
         )
-        if args.trace_order == "paired":
-            capture_plan = [fixed for _ in range(args.traces) for fixed in (True, False)]
-            interleave_description = "per-iteration fixed then random"
-        else:
-            capture_plan = [True] * args.traces + [False] * args.traces
-            order_rng = random.Random(args.order_seed)
-            order_rng.shuffle(capture_plan)
-            interleave_description = f"balanced shuffled fixed/random order seed=0x{args.order_seed:X}"
-
-        total_captures = len(capture_plan)
-        progress_interval = max(1, total_captures // 10)
-        fixed_seen = 0
-        random_seen = 0
         t0 = time.monotonic()
-        for capture_idx, is_fixed in enumerate(capture_plan, start=1):
+        for i in range(args.traces):
             load_group(
                 dut,
                 slots,
                 args.words_per_slot,
-                fixed=is_fixed,
+                fixed=True,
                 operation=args.operation,
                 fixed_mode=args.fixed_mode,
                 fixed_value=args.fixed_value,
@@ -530,23 +425,30 @@ def main() -> int:
                 secret_dist=secret_dist,
                 mlkem_eta=args.mlkem_eta,
                 mldsa_eta=args.mldsa_eta,
-                mask_shares=mask_shares,
             )
             trace, status = capture_operation(scope, dut, INSTR[args.operation], timeout_s=5.0)
-            if is_fixed:
-                fixed_traces.append(trace)
-                fixed_cycles.append(status.field1)
-                fixed_seen += 1
-            else:
-                random_traces.append(trace)
-                random_cycles.append(status.field1)
-                random_seen += 1
+            fixed_traces.append(trace)
+            fixed_cycles.append(status.field1)
 
-            if capture_idx % progress_interval == 0 or capture_idx == total_captures:
-                print(
-                    f"[TVLA] captured {capture_idx}/{total_captures} traces "
-                    f"(fixed={fixed_seen}/{args.traces} random={random_seen}/{args.traces})"
-                )
+            load_group(
+                dut,
+                slots,
+                args.words_per_slot,
+                fixed=False,
+                operation=args.operation,
+                fixed_mode=args.fixed_mode,
+                fixed_value=args.fixed_value,
+                fixed_map=fixed_map,
+                secret_dist=secret_dist,
+                mlkem_eta=args.mlkem_eta,
+                mldsa_eta=args.mldsa_eta,
+            )
+            trace, status = capture_operation(scope, dut, INSTR[args.operation], timeout_s=5.0)
+            random_traces.append(trace)
+            random_cycles.append(status.field1)
+
+            if (i + 1) % max(1, min(10, args.traces)) == 0:
+                print(f"[TVLA] captured {i + 1}/{args.traces} pairs")
 
         fixed_arr = np.vstack(fixed_traces)
         random_arr = np.vstack(random_traces)
@@ -608,13 +510,6 @@ def main() -> int:
                 "adc_mul": args.adc_mul,
                 "trigger": "tio4",
                 "adc_mode": "direct_extclk" if args.adc_mul == 1 else "extclk_pll",
-                "trace_order": args.trace_order,
-                "order_seed": args.order_seed if args.trace_order == "shuffle" else None,
-                "mask_shares": mask_shares,
-                "mlkem_mask_shares": mask_shares and is_mlkem_operation(args.operation),
-                "mldsa_mask_shares": mask_shares and is_mldsa_operation(args.operation),
-                "mask_memory_region": 1 if mask_shares else None,
-                "random_tape_region": 2 if mask_shares else None,
             },
             "hardware": {
                 "target": "CW305 Artix-7",
@@ -648,15 +543,7 @@ def main() -> int:
                     "memory-down banks. NTT/INTT load slots 0..3; PWM loads slots "
                     "0..7 so both multiplier operands are controlled by the TVLA class."
                 ),
-                "masking": (
-                    "ML-KEM/ML-DSA operands are split into fresh arithmetic share0/share1 "
-                    "per trace; share0 is loaded into region 0, share1 into region 1, "
-                    "and operation-formatted random tape into region 2. ML-DSA shares "
-                    "remain in the existing Montgomery residue domain."
-                    if mask_shares
-                    else "mask/share preload disabled for this capture"
-                ),
-                "interleave": interleave_description,
+                "interleave": "per-iteration fixed then random",
                 "limitation": (
                     "NO_THRESHOLD_CROSSING means no 1st-order leakage detected for this fixed seed "
                     "at this trace count; it is not a proof of absence."
@@ -701,11 +588,6 @@ def main() -> int:
             secret_dist_arg=args.secret_dist,
             mlkem_eta=args.mlkem_eta,
             mldsa_eta=args.mldsa_eta,
-            trace_order=args.trace_order,
-            order_seed=(args.order_seed if args.trace_order == "shuffle" else -1),
-            mask_shares=mask_shares,
-            mlkem_mask_shares=(mask_shares and is_mlkem_operation(args.operation)),
-            mldsa_mask_shares=(mask_shares and is_mldsa_operation(args.operation)),
             metadata_json=metadata_json,
         )
         meta_path = write_metadata(args.out, metadata)

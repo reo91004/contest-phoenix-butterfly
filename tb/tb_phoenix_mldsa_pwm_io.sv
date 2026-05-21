@@ -28,7 +28,6 @@ module tb_phoenix_mldsa_pwm_io;
     logic        host_valid;
     logic        host_we;
     logic        host_mem;
-    logic [1:0]  host_region;
     logic [1:0]  host_bank;
     logic [9:0]  host_addr;
     logic [31:0] host_din;
@@ -49,7 +48,6 @@ module tb_phoenix_mldsa_pwm_io;
         .host_valid(host_valid),
         .host_we(host_we),
         .host_mem(host_mem),
-        .host_region(host_region),
         .host_bank(host_bank),
         .host_addr(host_addr),
         .host_din(host_din),
@@ -131,7 +129,6 @@ module tb_phoenix_mldsa_pwm_io;
             end
             @(negedge clk);
             host_mem   = mem;
-            host_region = 2'b0;
             host_bank  = bank_of(index);
             host_addr  = addr_of(index);
             host_din   = data;
@@ -155,7 +152,6 @@ module tb_phoenix_mldsa_pwm_io;
             end
             @(negedge clk);
             host_mem   = mem;
-            host_region = 2'b0;
             host_bank  = bank_of(index);
             host_addr  = addr_of(index);
             host_din   = 32'b0;
@@ -190,7 +186,6 @@ module tb_phoenix_mldsa_pwm_io;
         host_valid = 1'b0;
         host_we = 1'b0;
         host_mem = 1'b0;
-        host_region = 2'b0;
         host_bank = 2'b0;
         host_addr = 10'b0;
         host_din = 32'b0;

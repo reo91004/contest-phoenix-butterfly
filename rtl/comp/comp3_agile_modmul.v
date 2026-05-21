@@ -12,13 +12,9 @@
 module comp3_agile_modmul (
     input  wire [31:0] a_i,
     input  wire [31:0] b_i,
-    input  wire [31:0] dummy_a_i,
-    input  wire [31:0] dummy_b_i,
     input  wire        opmode_i, // 0: ML-KEM, 1: ML-DSA
     output wire [31:0] c_o
 );
-    localparam USE_PRD_DSA_MUL_ONLY_IN_KEM = 1'b1;
-
     wire [31:0] kem_lo_raw;
     wire [31:0] kem_hi_raw;
     array_schoolbook_agile16 #(.CARRY_GATED_ARRAY(0)) u_kem_lo_mul (
@@ -41,20 +37,14 @@ module comp3_agile_modmul (
     wire [31:0] kem_out = {kem_hi_red, kem_lo_red};
 
     wire [47:0] dsa_raw48;
-    wire [23:0] dsa_mul_a = (USE_PRD_DSA_MUL_ONLY_IN_KEM && !opmode_i) ?
-                            dummy_a_i[23:0] : a_i[23:0];
-    wire [23:0] dsa_mul_b = (USE_PRD_DSA_MUL_ONLY_IN_KEM && !opmode_i) ?
-                            dummy_b_i[23:0] : b_i[23:0];
     mldsa_karatsuba24 u_dsa_mul (
-        .a_i(dsa_mul_a),
-        .b_i(dsa_mul_b),
+        .a_i(a_i[23:0]),
+        .b_i(b_i[23:0]),
         .p_o(dsa_raw48)
     );
     wire [31:0] dsa_out;
-    wire [63:0] dsa_red_in = (USE_PRD_DSA_MUL_ONLY_IN_KEM && !opmode_i) ?
-                              64'b0 : {16'b0, dsa_raw48};
     mldsa_montgomery_reduce u_dsa_red (
-        .a_i(dsa_red_in),
+        .a_i({16'b0, dsa_raw48}),
         .r_o(dsa_out)
     );
 

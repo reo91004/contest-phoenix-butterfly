@@ -14,14 +14,7 @@ module tb_comp1_comp2_comp4;
     wire [31:0] c1, c2, c4;
 
     comp1_agile_modadd_div2 u1 (.a_i(a), .b_i(b), .opmode_i(opm), .intt_i(itt), .c_o(c1));
-    comp2_agile_modarith_div2 u2 (
-        .a_i(a),
-        .b_i(b),
-        .opmode_i(opm),
-        .addsub_i(asb),
-        .intt_i(itt),
-        .c_o(c2)
-    );
+    comp2_agile_modarith_div2 u2 (.a_i(a), .b_i(b), .opmode_i(opm), .addsub_i(asb), .intt_i(itt), .c_o(c2));
     comp4_agile_modarith u4 (.a_i(a), .b_i(b), .opmode_i(opm), .addsub_i(asb), .c_o(c4));
 
     function [15:0] kadd(input integer x, input integer y); kadd = (x + y) % KQ; endfunction

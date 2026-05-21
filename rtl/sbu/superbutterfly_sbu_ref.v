@@ -14,15 +14,9 @@ module superbutterfly_sbu_ref (
     input  wire [31:0] a_i,
     input  wire [31:0] b_i,
     input  wire [31:0] c_i,
-    input  wire [31:0] a_mask_i,
-    input  wire [31:0] b_mask_i,
-    input  wire [31:0] c_mask_i,
-    input  wire [31:0] rand_i,
     output wire        valid_o,
     output wire [31:0] y0_o,
-    output wire [31:0] y1_o,
-    output wire [31:0] y0_mask_o,
-    output wire [31:0] y1_mask_o
+    output wire [31:0] y1_o
 );
     wire opmode = `SBU_OPMODE(sel_i);
 
@@ -66,8 +60,6 @@ module superbutterfly_sbu_ref (
     comp3_agile_modmul u_mul (
         .a_i(mul_a),
         .b_i(mul_b),
-        .dummy_a_i(32'b0),
-        .dummy_b_i(32'b0),
         .opmode_i(opmode),
         .c_o(prod)
     );
@@ -168,8 +160,6 @@ module superbutterfly_sbu_ref (
     delay_line #(.WIDTH(1),  .DEPTH(8)) u_dv (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(valid_i), .d_o(valid_o));
     delay_line #(.WIDTH(32), .DEPTH(8)) u_d0 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y0c),     .d_o(y0_o));
     delay_line #(.WIDTH(32), .DEPTH(8)) u_d1 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y1c),     .d_o(y1_o));
-    assign y0_mask_o = 32'b0;
-    assign y1_mask_o = 32'b0;
 endmodule
 
 `default_nettype wire

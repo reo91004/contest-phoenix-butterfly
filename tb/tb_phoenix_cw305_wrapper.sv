@@ -40,7 +40,6 @@ module tb_phoenix_cw305_wrapper;
     endfunction
 
     function [127:0] mem_key;
-        input [1:0] region;
         input [3:0] slot;
         input       bulk;
         input       rd;
@@ -50,7 +49,6 @@ module tb_phoenix_cw305_wrapper;
             mem_key[126:123] = slot;
             mem_key[122] = bulk;
             mem_key[121] = rd;
-            mem_key[120:119] = region;
             mem_key[9:0] = addr;
         end
     endfunction
@@ -86,24 +84,10 @@ module tb_phoenix_cw305_wrapper;
         input [9:0] addr;
         input [31:0] expected;
         begin
-            issue(mem_key(2'd0, slot, 1'b0, 1'b1, addr), 128'b0);
+            issue(mem_key(slot, 1'b0, 1'b1, addr), 128'b0);
             if (data_o[127:96] !== MAGIC || data_o[31:0] !== expected) begin
                 $error("wrapper read mismatch slot=%0d addr=%0d got=%08x expected=%08x magic=%08x",
                        slot, addr, data_o[31:0], expected, data_o[127:96]);
-            end
-        end
-    endtask
-
-    task automatic read_region_expect;
-        input [1:0] region;
-        input [3:0] slot;
-        input [9:0] addr;
-        input [31:0] expected;
-        begin
-            issue(mem_key(region, slot, 1'b0, 1'b1, addr), 128'b0);
-            if (data_o[127:96] !== MAGIC || data_o[31:0] !== expected) begin
-                $error("wrapper region read mismatch region=%0d slot=%0d addr=%0d got=%08x expected=%08x magic=%08x",
-                       region, slot, addr, data_o[31:0], expected, data_o[127:96]);
             end
         end
     endtask
@@ -116,20 +100,15 @@ module tb_phoenix_cw305_wrapper;
         rst_n = 1'b1;
         repeat (4) @(posedge clk);
 
-        issue(mem_key(2'd0, 4'd0, 1'b0, 1'b0, 10'd3), {96'b0, 32'h11223344});
+        issue(mem_key(4'd0, 1'b0, 1'b0, 10'd3), {96'b0, 32'h11223344});
         read_expect(4'd0, 10'd3, 32'h11223344);
 
-        issue(mem_key(2'd0, 4'd5, 1'b1, 1'b0, 10'd20),
+        issue(mem_key(4'd5, 1'b1, 1'b0, 10'd20),
               {32'h44444444, 32'h33333333, 32'h22222222, 32'h11111111});
         read_expect(4'd5, 10'd20, 32'h11111111);
         read_expect(4'd5, 10'd21, 32'h22222222);
         read_expect(4'd5, 10'd22, 32'h33333333);
         read_expect(4'd5, 10'd23, 32'h44444444);
-
-        issue(mem_key(2'd1, 4'd0, 1'b0, 1'b0, 10'd7), {96'b0, 32'hdeadbeef});
-        issue(mem_key(2'd2, 4'd4, 1'b0, 1'b0, 10'd7), {96'b0, 32'hcafef00d});
-        read_region_expect(2'd1, 4'd0, 10'd7, 32'hdeadbeef);
-        read_region_expect(2'd2, 4'd4, 10'd7, 32'hcafef00d);
 
         issue(start_key(make_instr(1'b0, OP_FWD)), 128'b0);
         if (data_o[127:96] !== MAGIC || data_o[95:64] == 32'd0) begin
@@ -141,7 +120,7 @@ module tb_phoenix_cw305_wrapper;
             $error("wrapper ML-DSA start status mismatch magic=%08x cycles=%0d", data_o[127:96], data_o[95:64]);
         end
 
-        $display("[PHOENIX-CW305-WRAPPER] checks=10 errors=0 PASS");
+        $display("[PHOENIX-CW305-WRAPPER] checks=8 errors=0 PASS");
         $finish;
     end
 endmodule

@@ -11,18 +11,10 @@ module tb_comp3_agile_modmul;
     localparam longint unsigned RINV = 64'd8265825;
     integer n, k, errors, checks;
     reg  [31:0] a, b;
-    reg  [31:0] da, db;
     reg         opm;
     wire [31:0] c;
 
-    comp3_agile_modmul u_dut (
-        .a_i(a),
-        .b_i(b),
-        .dummy_a_i(da),
-        .dummy_b_i(db),
-        .opmode_i(opm),
-        .c_o(c)
-    );
+    comp3_agile_modmul u_dut (.a_i(a), .b_i(b), .opmode_i(opm), .c_o(c));
 
     function [15:0] kmul(input [15:0] x, input [15:0] y);
         begin kmul = (x * y) % KQ; end
@@ -44,8 +36,6 @@ module tb_comp3_agile_modmul;
         begin
             a = {a1, a0};
             b = {b1, b0};
-            da = $urandom;
-            db = $urandom;
             opm = 1'b0;
             exp = {kmul(a1,b1), kmul(a0,b0)};
             #1;
@@ -63,8 +53,6 @@ module tb_comp3_agile_modmul;
         begin
             a = xa;
             b = xb;
-            da = $urandom;
-            db = $urandom;
             opm = 1'b1;
             exp = dmul_mont(xa, xb);
             #1;

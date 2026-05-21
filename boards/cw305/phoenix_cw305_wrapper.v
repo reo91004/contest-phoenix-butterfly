@@ -10,7 +10,6 @@
 //   key_i[126:123] = slot: 0..3 memory-up banks, 4..7 memory-down banks
 //   key_i[122]     = bulk write, four 32-bit words to addr..addr+3
 //   key_i[121]     = read single 32-bit word
-//   key_i[120:119] = region: 0=share0 data, 1=share1 mask, 2=random tape
 //   key_i[9:0]     = word address inside the selected bank
 //   data_i[31:0]   = single write payload
 //   data_i[127:0]  = bulk write payload, four little-endian 32-bit words
@@ -59,7 +58,6 @@ module phoenix_cw305_wrapper (
     reg        host_valid_r;
     reg        host_we_r;
     reg        host_mem_r;
-    reg [1:0]  host_region_r;
     reg [1:0]  host_bank_r;
     reg [9:0]  host_addr_r;
     reg [31:0] host_din_r;
@@ -67,7 +65,6 @@ module phoenix_cw305_wrapper (
     wire        host_ready;
 
     reg [3:0]   slot_r;
-    reg [1:0]   region_r;
     reg [9:0]   addr_r;
     reg [127:0] payload_r;
     reg [1:0]   bulk_idx_r;
@@ -77,7 +74,6 @@ module phoenix_cw305_wrapper (
     wire cmd_bulk  = key_i[122];
     wire cmd_read  = key_i[121];
     wire slot_valid = (key_i[126:123] < 4'd8);
-    wire region_valid = (key_i[120:119] < 2'd3);
 
     wire [31:0] dbg_pe_o00, dbg_pe_o01, dbg_pe_o10, dbg_pe_o11;
     wire        dbg_pe_v0, dbg_pe_v1;
@@ -93,7 +89,6 @@ module phoenix_cw305_wrapper (
         .host_valid(host_valid_r),
         .host_we(host_we_r),
         .host_mem(host_mem_r),
-        .host_region(host_region_r),
         .host_bank(host_bank_r),
         .host_addr(host_addr_r),
         .host_din(host_din_r),
@@ -134,12 +129,10 @@ module phoenix_cw305_wrapper (
             host_valid_r  <= 1'b0;
             host_we_r     <= 1'b0;
             host_mem_r    <= 1'b0;
-            host_region_r <= 2'b0;
             host_bank_r   <= 2'b0;
             host_addr_r   <= 10'b0;
             host_din_r    <= 32'b0;
             slot_r        <= 4'b0;
-            region_r      <= 2'b0;
             addr_r        <= 10'b0;
             payload_r     <= 128'b0;
             bulk_idx_r    <= 2'b0;
@@ -159,7 +152,6 @@ module phoenix_cw305_wrapper (
                         payload_r <= data_i;
                         addr_r    <= key_i[9:0];
                         slot_r    <= key_i[126:123];
-                        region_r  <= key_i[120:119];
 
                         if (cmd_start) begin
                             if (!host_ready) begin
@@ -170,9 +162,9 @@ module phoenix_cw305_wrapper (
                                 instr_r <= key_i[126:118];
                                 state <= S_START_ISSUE;
                             end
-                        end else if (!slot_valid || !region_valid) begin
+                        end else if (!slot_valid) begin
                             error_code_r <= 4'd2;
-                            data_o_r <= status_word(32'hffff0002, {26'b0, key_i[120:119], key_i[126:123]}, 32'b0);
+                            data_o_r <= status_word(32'hffff0002, {28'b0, key_i[126:123]}, 32'b0);
                             state <= S_DONE;
                         end else if (!host_ready) begin
                             error_code_r <= 4'd3;
@@ -211,7 +203,6 @@ module phoenix_cw305_wrapper (
                     host_valid_r <= 1'b1;
                     host_we_r    <= 1'b1;
                     host_mem_r   <= slot_r[2];
-                    host_region_r <= region_r;
                     host_bank_r  <= slot_r[1:0];
                     host_addr_r  <= addr_r;
                     host_din_r   <= payload_r[31:0];
@@ -219,7 +210,7 @@ module phoenix_cw305_wrapper (
                 end
 
                 S_MEM_WRITE_DONE: begin
-                    data_o_r <= status_word(32'b0, {16'b0, region_r, slot_r, addr_r}, payload_r[31:0]);
+                    data_o_r <= status_word(32'b0, {18'b0, slot_r, addr_r}, payload_r[31:0]);
                     state <= S_DONE;
                 end
 
@@ -227,7 +218,6 @@ module phoenix_cw305_wrapper (
                     host_valid_r <= 1'b1;
                     host_we_r    <= 1'b0;
                     host_mem_r   <= slot_r[2];
-                    host_region_r <= region_r;
                     host_bank_r  <= slot_r[1:0];
                     host_addr_r  <= addr_r;
                     state <= S_MEM_READ_WAIT;
@@ -238,7 +228,7 @@ module phoenix_cw305_wrapper (
                 end
 
                 S_MEM_READ_DONE: begin
-                    data_o_r <= status_word(32'b0, {16'b0, region_r, slot_r, addr_r}, host_dout);
+                    data_o_r <= status_word(32'b0, {18'b0, slot_r, addr_r}, host_dout);
                     state <= S_DONE;
                 end
 
@@ -246,7 +236,6 @@ module phoenix_cw305_wrapper (
                     host_valid_r <= 1'b1;
                     host_we_r    <= 1'b1;
                     host_mem_r   <= slot_r[2];
-                    host_region_r <= region_r;
                     host_bank_r  <= slot_r[1:0];
                     host_addr_r  <= addr_r + {8'b0, bulk_idx_r};
                     host_din_r   <= bulk_word(payload_r, bulk_idx_r);
@@ -255,7 +244,7 @@ module phoenix_cw305_wrapper (
 
                 S_BULK_STEP: begin
                     if (bulk_idx_r == 2'd3) begin
-                        data_o_r <= status_word(32'b0, {16'b0, region_r, slot_r, addr_r}, 32'h00000004);
+                        data_o_r <= status_word(32'b0, {18'b0, slot_r, addr_r}, 32'h00000004);
                         state <= S_DONE;
                     end else begin
                         bulk_idx_r <= bulk_idx_r + 1'b1;
