@@ -15,18 +15,24 @@ module tb_superbutterfly_all_modes;
     reg clk = 0, rst_ni = 0, vin = 0;
     reg [8:0] sel;
     reg [31:0] a, b, c;
+    reg [31:0] am, bm, cm, rnd;
     wire vrf, vrt;
     wire [31:0] y0rf, y1rf, y0rt, y1rt;
+    wire [31:0] y0mf, y1mf, y0mt, y1mt;
 
     superbutterfly_sbu #(.USE_REF(1)) u_ref (
         .clk_i(clk), .rst_ni(rst_ni), .valid_i(vin),
         .sel_i(sel), .a_i(a), .b_i(b), .c_i(c),
-        .valid_o(vrf), .y0_o(y0rf), .y1_o(y1rf)
+        .a_mask_i(am), .b_mask_i(bm), .c_mask_i(cm), .rand_i(rnd),
+        .valid_o(vrf), .y0_o(y0rf), .y1_o(y1rf),
+        .y0_mask_o(y0mf), .y1_mask_o(y1mf)
     );
     superbutterfly_sbu #(.USE_REF(0)) u_rt (
         .clk_i(clk), .rst_ni(rst_ni), .valid_i(vin),
         .sel_i(sel), .a_i(a), .b_i(b), .c_i(c),
-        .valid_o(vrt), .y0_o(y0rt), .y1_o(y1rt)
+        .a_mask_i(am), .b_mask_i(bm), .c_mask_i(cm), .rand_i(rnd),
+        .valid_o(vrt), .y0_o(y0rt), .y1_o(y1rt),
+        .y0_mask_o(y0mt), .y1_mask_o(y1mt)
     );
 
     always #5 clk = ~clk;
@@ -153,19 +159,19 @@ module tb_superbutterfly_all_modes;
         cyc = 0;
         NSTREAM = 4000;
         for (i = 0; i < 1024; i = i + 1) h_v[i] = 0;
-        rst_ni = 0; vin = 0; sel = 0; a = 0; b = 0; c = 0;
+        rst_ni = 0; vin = 0; sel = 0; a = 0; b = 0; c = 0; am = 0; bm = 0; cm = 0; rnd = 0;
         repeat (4) @(posedge clk);
         rst_ni = 1;
 
-        @(negedge clk); sel = `SBU_MOD_ADD; a = {16'd7,16'd5}; b = {16'd9,16'd3}; c = 0; vin = 1;
-        @(negedge clk); vin = 0; sel = 0; a = 0; b = 0; c = 0;
+        @(negedge clk); sel = `SBU_MOD_ADD; a = {16'd7,16'd5}; b = {16'd9,16'd3}; c = 0; am = 0; bm = 0; cm = 0; rnd = 0; vin = 1;
+        @(negedge clk); vin = 0; sel = 0; a = 0; b = 0; c = 0; am = 0; bm = 0; cm = 0; rnd = 0;
         latency_meas = 0;
         while (!vrf && latency_meas < 32) begin @(posedge clk); latency_meas = latency_meas + 1; end
         if (latency_meas !== 8) begin errors = errors + 1; $display("[FAIL] ref latency=%0d", latency_meas); end
         else $display("[tb_sbu] ref latency = 8 OK");
 
         repeat (12) @(posedge clk);
-        @(negedge clk); sel = `SBU_MOD_ADD; a = {16'd7,16'd5}; b = {16'd9,16'd3}; c = 0; vin = 1;
+        @(negedge clk); sel = `SBU_MOD_ADD; a = {16'd7,16'd5}; b = {16'd9,16'd3}; c = 0; am = 0; bm = 0; cm = 0; rnd = 0; vin = 1;
         @(negedge clk); vin = 0;
         latency_meas = 0;
         while (!vrt && latency_meas < 32) begin @(posedge clk); latency_meas = latency_meas + 1; end
@@ -181,10 +187,18 @@ module tb_superbutterfly_all_modes;
                 a = {rq_kem(0), rq_kem(0)};
                 b = {rq_kem(0), rq_kem(0)};
                 c = {rq_kem(0), rq_kem(0)};
+                am = 32'b0;
+                bm = 32'b0;
+                cm = 32'b0;
+                rnd = 32'b0;
             end else begin
                 a = rq_dsa(0);
                 b = rq_dsa(0);
                 c = rq_dsa(0);
+                am = 32'b0;
+                bm = 32'b0;
+                cm = 32'b0;
+                rnd = 32'b0;
             end
             vin = 1;
             h_sel[cyc % 1024] = sel;
@@ -207,6 +221,7 @@ module tb_superbutterfly_all_modes;
         for (i = 0; i < 12; i = i + 1) begin
             @(negedge clk);
             vin = 0;
+            am = 32'b0; bm = 32'b0; cm = 32'b0; rnd = 32'b0;
             h_v[cyc % 1024] = 0;
             if (cyc >= 8 && h_v[(cyc-8) % 1024] && vrf) begin
                 golden(h_sel[(cyc-8) % 1024], h_a[(cyc-8) % 1024],

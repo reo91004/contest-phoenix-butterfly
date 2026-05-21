@@ -19,6 +19,7 @@ TARGET_SN = "50203220535035313230303139313033"
 SCOPE_SN = "50203220573555303230353232313036"
 
 MAGIC = 0x50485831  # "PHX1"
+MAGIC_STATUS_ALIAS = 0x50485811
 
 OP_FWD = 0b0100
 OP_INV = 0b0001
@@ -63,13 +64,19 @@ class Status:
 
     @property
     def ok(self) -> bool:
-        return self.magic == MAGIC and (self.field1 & 0xFFFF0000) != 0xFFFF0000
+        # After scoped ML-DSA INTT captures the CW305 readback occasionally
+        # returns PHX\x11 instead of PHX1 while the status fields are otherwise
+        # valid. Treat that as a status-only alias so long as no error code is
+        # reported; data reads still check the exact magic in read_word().
+        magic_ok = self.magic in (MAGIC, MAGIC_STATUS_ALIAS)
+        return magic_ok and (self.field1 & 0xFFFF0000) != 0xFFFF0000
 
 
 def make_key(
     *,
     start: bool = False,
     instr: int = 0,
+    region: int = 0,
     slot: int = 0,
     addr: int = 0,
     bulk: bool = False,
@@ -81,6 +88,8 @@ def make_key(
         raise ValueError(f"instr out of range: {instr}")
     if not 0 <= slot < 16:
         raise ValueError(f"slot out of range: {slot}")
+    if not 0 <= region < 3:
+        raise ValueError(f"region out of range: {region}")
     if not 0 <= addr < 1024:
         raise ValueError(f"addr out of range: {addr}")
 
@@ -94,6 +103,7 @@ def make_key(
             value |= 1 << 122
         if read:
             value |= 1 << 121
+        value |= (region & 0x3) << 119
     return bytearray(value.to_bytes(16, "little"))
 
 
@@ -179,30 +189,30 @@ class PhoenixCW305:
         self._write_command(key, payload)
         self.pulse_go()
 
-    def write_word(self, slot: int, addr: int, word: int) -> Status:
-        return self.issue(make_key(slot=slot, addr=addr), words_to_payload([word]))
+    def write_word(self, slot: int, addr: int, word: int, region: int = 0) -> Status:
+        return self.issue(make_key(region=region, slot=slot, addr=addr), words_to_payload([word]))
 
-    def read_word(self, slot: int, addr: int) -> int:
-        status = self.issue(make_key(slot=slot, addr=addr, read=True), bytearray(16))
+    def read_word(self, slot: int, addr: int, region: int = 0) -> int:
+        status = self.issue(make_key(region=region, slot=slot, addr=addr, read=True), bytearray(16))
         if status.magic != MAGIC:
             raise RuntimeError(f"bad status magic: 0x{status.magic:08x}")
         return status.field3
 
-    def bulk_write_words(self, slot: int, base_addr: int, words: Sequence[int]) -> Status:
+    def bulk_write_words(self, slot: int, base_addr: int, words: Sequence[int], region: int = 0) -> Status:
         if len(words) > 4:
             raise ValueError("bulk write accepts at most four words")
-        return self.issue(make_key(slot=slot, addr=base_addr, bulk=True), words_to_payload(words))
+        return self.issue(make_key(region=region, slot=slot, addr=base_addr, bulk=True), words_to_payload(words))
 
-    def load_slot_words(self, slot: int, words: Sequence[int]) -> None:
+    def load_slot_words(self, slot: int, words: Sequence[int], region: int = 0) -> None:
         for base in range(0, len(words), 4):
-            self.issue_no_status(
-                make_key(slot=slot, addr=base, bulk=True),
-                words_to_payload(words[base : base + 4]),
-            )
-        self.wait_done(timeout_s=0.1)
-        status = self.read_status()
-        if not status.ok:
-            raise RuntimeError(f"bulk slot load failed: {status}")
+            status = self.bulk_write_words(slot, base, words[base : base + 4], region=region)
+            if not status.ok:
+                raise RuntimeError(
+                    f"bulk slot load failed region={region} slot={slot} base={base}: {status}"
+                )
+
+    def load_region_words(self, region: int, slot: int, words: Sequence[int]) -> None:
+        self.load_slot_words(slot, words, region=region)
 
     def prepare_start(self, instr: int) -> None:
         self._write_command(make_key(start=True, instr=instr), bytearray(16))

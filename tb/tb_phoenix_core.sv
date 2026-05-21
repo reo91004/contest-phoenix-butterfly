@@ -32,6 +32,7 @@ module tb_phoenix_core;
         .host_valid(1'b0),
         .host_we(1'b0),
         .host_mem(1'b0),
+        .host_region(2'b0),
         .host_bank(2'b0),
         .host_addr(10'b0),
         .host_din(32'b0),

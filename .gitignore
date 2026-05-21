@@ -68,6 +68,21 @@ synth/synth_dsp_result*.txt
 !/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/
 /reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/*
 !/reports/tvla/comp3_internal_stage2_dsa_mul_only_prd_key_repeat_260521/mlkem_mldsa_tvla_overview.png
+
+!/reports/tvla/arithmetic_masking_mlkem_full_260521/
+/reports/tvla/arithmetic_masking_mlkem_full_260521/*
+!/reports/tvla/arithmetic_masking_mlkem_full_260521/mlkem_mldsa_tvla_overview.png
+!/reports/tvla/arithmetic_masking_mlkem_full_260521/comparison_vs_comp3_stage2.png
+!/reports/tvla/arithmetic_masking_mlkem_full_260521/comparison_vs_original_baseline.png
+
+!/reports/tvla/arithmetic_masking_mlkem_repeat_260521/
+/reports/tvla/arithmetic_masking_mlkem_repeat_260521/*
+!/reports/tvla/arithmetic_masking_mlkem_repeat_260521/mlkem_repeat_tvla_overview.png
+
+!/reports/tvla/arithmetic_masking_mldsa_full_260521/
+/reports/tvla/arithmetic_masking_mldsa_full_260521/*
+!/reports/tvla/arithmetic_masking_mldsa_full_260521/mlkem_mldsa_tvla_overview.png
+!/reports/tvla/arithmetic_masking_mldsa_full_260521/comparison_vs_original_baseline.png
 /tb/vectors/
 *.dcp
 

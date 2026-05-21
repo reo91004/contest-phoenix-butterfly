@@ -18,6 +18,7 @@ module tb_phoenix_host_io;
     logic        host_valid;
     logic        host_we;
     logic        host_mem;
+    logic [1:0]  host_region;
     logic [1:0]  host_bank;
     logic [9:0]  host_addr;
     logic [31:0] host_din;
@@ -38,6 +39,7 @@ module tb_phoenix_host_io;
         .host_valid(host_valid),
         .host_we(host_we),
         .host_mem(host_mem),
+        .host_region(host_region),
         .host_bank(host_bank),
         .host_addr(host_addr),
         .host_din(host_din),
@@ -67,11 +69,23 @@ module tb_phoenix_host_io;
         input [9:0] addr;
         input [31:0] data;
         begin
+            host_write_region(2'd0, mem, bank, addr, data);
+        end
+    endtask
+
+    task automatic host_write_region;
+        input [1:0] region;
+        input       mem;
+        input [1:0] bank;
+        input [9:0] addr;
+        input [31:0] data;
+        begin
             if (!host_ready) begin
                 $error("host_write while host_ready is low");
             end
             @(negedge clk);
             host_mem   = mem;
+            host_region = region;
             host_bank  = bank;
             host_addr  = addr;
             host_din   = data;
@@ -90,11 +104,23 @@ module tb_phoenix_host_io;
         input [9:0] addr;
         input [31:0] expected;
         begin
+            host_read_region_expect(2'd0, mem, bank, addr, expected);
+        end
+    endtask
+
+    task automatic host_read_region_expect;
+        input [1:0] region;
+        input       mem;
+        input [1:0] bank;
+        input [9:0] addr;
+        input [31:0] expected;
+        begin
             if (!host_ready) begin
                 $error("host_read while host_ready is low");
             end
             @(negedge clk);
             host_mem   = mem;
+            host_region = region;
             host_bank  = bank;
             host_addr  = addr;
             host_din   = 32'b0;
@@ -104,8 +130,8 @@ module tb_phoenix_host_io;
             #1;
             host_valid = 1'b0;
             if (host_dout !== expected) begin
-                $error("host read mismatch mem=%0d bank=%0d addr=%0d got=%08x expected=%08x",
-                       mem, bank, addr, host_dout, expected);
+                $error("host read mismatch region=%0d mem=%0d bank=%0d addr=%0d got=%08x expected=%08x",
+                       region, mem, bank, addr, host_dout, expected);
             end
         end
     endtask
@@ -136,6 +162,7 @@ module tb_phoenix_host_io;
         host_valid = 1'b0;
         host_we = 1'b0;
         host_mem = 1'b0;
+        host_region = 2'b0;
         host_bank = 2'b0;
         host_addr = 10'b0;
         host_din = 32'b0;
@@ -154,9 +181,17 @@ module tb_phoenix_host_io;
         host_read_expect(1'b1, 2'd1, 10'd5,  32'haabbccdd);
         host_read_expect(1'b1, 2'd3, 10'd29, 32'h01020304);
 
+        host_write_region(2'd1, 1'b0, 2'd0, 10'd3, 32'h00000555);
+        host_write_region(2'd2, 1'b1, 2'd0, 10'd3, 32'h00000aaa);
+        host_read_region_expect(2'd1, 1'b0, 2'd0, 10'd3, 32'h00000555);
+        host_read_region_expect(2'd2, 1'b1, 2'd0, 10'd3, 32'h00000aaa);
+        if (((32'h11223344 + 32'h00000555) & 32'hffffffff) !== 32'h11223899) begin
+            $error("host recombine smoke arithmetic mismatch");
+        end
+
         run_short_op();
 
-        $display("[PHOENIX-HOST-IO] checks=5 errors=0 PASS");
+        $display("[PHOENIX-HOST-IO] checks=7 errors=0 PASS");
         $finish;
     end
 endmodule

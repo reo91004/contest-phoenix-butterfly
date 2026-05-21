@@ -32,7 +32,7 @@ UNIT_TBS="tb_kyber_modarith tb_barrett_reduce \
           tb_array_schoolbook_agile16 tb_mldsa_karatsuba24 \
           tb_mldsa_montgomery_reduce tb_mldsa_modarith \
           tb_comp1_comp2_comp4 tb_comp3_agile_modmul \
-          tb_superbutterfly_all_modes"
+          tb_superbutterfly_all_modes tb_mlkem_masked_sbu tb_mldsa_masked_sbu"
 TOP_TBS="tb_phoenix_core tb_phoenix_host_io tb_phoenix_cw305_wrapper \
          tb_phoenix_mldsa_pwm_io"
 

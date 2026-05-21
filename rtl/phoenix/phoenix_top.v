@@ -36,6 +36,7 @@ module phoenix_top #(
     input  wire         host_valid,
     input  wire         host_we,
     input  wire         host_mem,       // 0 = memory-up, 1 = memory-down
+    input  wire [1:0]   host_region,    // 0=share0 data, 1=share1 mask, 2=random tape
     input  wire [1:0]   host_bank,
     input  wire [ADDR_W-1:0] host_addr,
     input  wire [DATA_W-1:0] host_din,
@@ -200,8 +201,15 @@ module phoenix_top #(
 
     wire [4*ADDR_W-1:0] read_addr = pack_addr4(bk0a, ad0a, bk0b, ad0b, bk1a, ad1a, bk1b, ad1b);
     wire host_active = host_valid && host_ready;
-    wire host_mu = host_active && !host_mem;
-    wire host_md = host_active &&  host_mem;
+    wire host_data_region = (host_region == 2'd0);
+    wire host_mask_region = (host_region == 2'd1);
+    wire host_rand_region = (host_region == 2'd2);
+    wire host_mu = host_active && host_data_region && !host_mem;
+    wire host_md = host_active && host_data_region &&  host_mem;
+    wire host_mmu = host_active && host_mask_region && !host_mem;
+    wire host_mmd = host_active && host_mask_region &&  host_mem;
+    wire host_rmu = host_active && host_rand_region && !host_mem;
+    wire host_rmd = host_active && host_rand_region &&  host_mem;
     wire [4*ADDR_W-1:0] host_addr4 = pack_addr4(host_bank, host_addr,
                                                 host_bank, host_addr,
                                                 host_bank, host_addr,
@@ -213,7 +221,10 @@ module phoenix_top #(
     wire [3:0] host_we4 = pack_we1(host_active && host_we, host_bank);
 
     wire [4*DATA_W-1:0] mu_a_dout, md_a_dout;
+    wire [4*DATA_W-1:0] mmu_a_dout, mmd_a_dout;
+    wire [4*DATA_W-1:0] rmu_a_dout, rmd_a_dout;
     wire [DATA_W-1:0] sbu0_o0, sbu0_o1, sbu1_o0, sbu1_o1;
+    wire [DATA_W-1:0] sbu0_m0, sbu0_m1, sbu1_m0, sbu1_m1;
     wire              sbu0_vo, sbu1_vo;
 
     (* shreg_extract = "no" *) reg [1:0]        wb_b0 [0:WB_LAT-1];
@@ -273,6 +284,8 @@ module phoenix_top #(
 
     wire is_mldsa_pwm = (ctl_sel0 == `SBU_MLDSA_PWM);
     wire is_mlkem_pwm = ctl_pwm_chain;
+    wire is_mldsa_now = ctl_sel0[8];
+    wire is_mlkem_now = !is_mldsa_now;
     wire independent_wb = (!ctl_pwm_chain) && (sbu0_vo | sbu1_vo);
     wire pwm_chain_wb   = ctl_pwm_chain && sbu1_vo;
 
@@ -288,6 +301,10 @@ module phoenix_top #(
                                                 wb_b1[WB_LAT-1], sbu0_o1,
                                                 wb_b2[WB_LAT-1], sbu1_o0,
                                                 wb_b3[WB_LAT-1], sbu1_o1);
+    wire [4*DATA_W-1:0] wb_din_fft_mask = pack_data4(wb_b0[WB_LAT-1], sbu0_m0,
+                                                     wb_b1[WB_LAT-1], sbu0_m1,
+                                                     wb_b2[WB_LAT-1], sbu1_m0,
+                                                     wb_b3[WB_LAT-1], sbu1_m1);
 
     wire [3:0] wb_we_mldsa_pwm = pack_we2(independent_wb && is_mldsa_pwm,
                                         wb_b0[WB_LAT-1], wb_b2[WB_LAT-1]);
@@ -299,6 +316,10 @@ module phoenix_top #(
                                                     wb_b2[WB_LAT-1], sbu1_o0,
                                                     wb_b0[WB_LAT-1], sbu0_o0,
                                                     wb_b2[WB_LAT-1], sbu1_o0);
+    wire [4*DATA_W-1:0] wb_din_mldsa_pwm_mask = pack_data4(wb_b0[WB_LAT-1], sbu0_m0,
+                                                          wb_b2[WB_LAT-1], sbu1_m0,
+                                                          wb_b0[WB_LAT-1], sbu0_m0,
+                                                          wb_b2[WB_LAT-1], sbu1_m0);
 
     wire [3:0] mu_b_we_ind = is_mldsa_pwm ? wb_we_mldsa_pwm :
                               ctl_mem_down ? 4'b0 : wb_we_fft;
@@ -323,10 +344,25 @@ module phoenix_top #(
     wire [4*ADDR_W-1:0] md_b_addr_w = wb_addr_fft;
     wire [4*DATA_W-1:0] md_b_din_w = wb_din_fft;
 
+    wire [4*DATA_W-1:0] mu_b_din_ind_mask = is_mldsa_pwm ? wb_din_mldsa_pwm_mask : wb_din_fft_mask;
+    wire [4*DATA_W-1:0] mu_b_din_pwm_mask = pack_data4(pwm_wb_b0[PWM_WB_LAT-1], sbu1_m0,
+                                                       pwm_wb_b0[PWM_WB_LAT-1], sbu1_m0,
+                                                       pwm_wb_b0[PWM_WB_LAT-1], sbu1_m0,
+                                                       pwm_wb_b0[PWM_WB_LAT-1], sbu1_m0);
+    wire [3:0] mmu_b_we_w = mu_b_we_w;
+    wire [4*ADDR_W-1:0] mmu_b_addr_w = mu_b_addr_w;
+    wire [4*DATA_W-1:0] mmu_b_din_w = pwm_chain_wb ? mu_b_din_pwm_mask : mu_b_din_ind_mask;
+    wire [3:0] mmd_b_we_w = (fftlike_wb && ctl_mem_down) ? wb_we_fft : 4'b0;
+    wire [4*ADDR_W-1:0] mmd_b_addr_w = wb_addr_fft;
+    wire [4*DATA_W-1:0] mmd_b_din_w = wb_din_fft_mask;
+
     wire [3:0] host_read_en = pack_we1(host_active, host_bank);
     wire       core_reads_both_sides = is_mlkem_pwm || is_mldsa_pwm;
     wire [3:0] core_mu_read_en = (idx_valid && (!ctl_mem_down || core_reads_both_sides)) ? 4'hf : 4'b0;
     wire [3:0] core_md_read_en = (idx_valid && ( ctl_mem_down || core_reads_both_sides)) ? 4'hf : 4'b0;
+    wire [3:0] core_mask_mu_read_en = core_mu_read_en;
+    wire [3:0] core_mask_md_read_en = core_md_read_en;
+    wire [3:0] core_rand_read_en = (idx_valid && (is_mlkem_pwm || is_mldsa_pwm)) ? 4'hf : 4'b0;
     wire [3:0] mu_a_en_w = host_mu ? host_read_en : core_mu_read_en;
     wire [3:0] md_a_en_w = host_md ? host_read_en : core_md_read_en;
     wire [3:0] mu_a_we_w = host_mu ? host_we4 : 4'b0;
@@ -335,6 +371,22 @@ module phoenix_top #(
     wire [3:0] md_a_we_w = host_md ? host_we4 : 4'b0;
     wire [4*ADDR_W-1:0] md_a_addr_w = host_md ? host_addr4 : read_addr;
     wire [4*DATA_W-1:0] md_a_din_w = host_md ? host_din4 : {4*DATA_W{1'b0}};
+    wire [3:0] mmu_a_en_w = host_mmu ? host_read_en : core_mask_mu_read_en;
+    wire [3:0] mmd_a_en_w = host_mmd ? host_read_en : core_mask_md_read_en;
+    wire [3:0] mmu_a_we_w = host_mmu ? host_we4 : 4'b0;
+    wire [4*ADDR_W-1:0] mmu_a_addr_w = host_mmu ? host_addr4 : read_addr;
+    wire [4*DATA_W-1:0] mmu_a_din_w = host_mmu ? host_din4 : {4*DATA_W{1'b0}};
+    wire [3:0] mmd_a_we_w = host_mmd ? host_we4 : 4'b0;
+    wire [4*ADDR_W-1:0] mmd_a_addr_w = host_mmd ? host_addr4 : read_addr;
+    wire [4*DATA_W-1:0] mmd_a_din_w = host_mmd ? host_din4 : {4*DATA_W{1'b0}};
+    wire [3:0] rmu_a_en_w = host_rmu ? host_read_en : core_rand_read_en;
+    wire [3:0] rmd_a_en_w = host_rmd ? host_read_en : core_rand_read_en;
+    wire [3:0] rmu_a_we_w = host_rmu ? host_we4 : 4'b0;
+    wire [4*ADDR_W-1:0] rmu_a_addr_w = host_rmu ? host_addr4 : read_addr;
+    wire [4*DATA_W-1:0] rmu_a_din_w = host_rmu ? host_din4 : {4*DATA_W{1'b0}};
+    wire [3:0] rmd_a_we_w = host_rmd ? host_we4 : 4'b0;
+    wire [4*ADDR_W-1:0] rmd_a_addr_w = host_rmd ? host_addr4 : read_addr;
+    wire [4*DATA_W-1:0] rmd_a_din_w = host_rmd ? host_din4 : {4*DATA_W{1'b0}};
 
     poly_memory_updown #(.DEPTH(1024), .DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_pm (
         .clk      (clk),
@@ -356,6 +408,46 @@ module phoenix_top #(
         .md_b_din (md_b_din_w)
     );
 
+    poly_memory_updown #(.DEPTH(1024), .DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_pm_mask (
+        .clk      (clk),
+        .mu_a_en   (mmu_a_en_w),
+        .mu_a_we  (mmu_a_we_w),
+        .mu_a_addr(mmu_a_addr_w),
+        .mu_a_din (mmu_a_din_w),
+        .mu_a_dout(mmu_a_dout),
+        .mu_b_we  (mmu_b_we_w),
+        .mu_b_addr(mmu_b_addr_w),
+        .mu_b_din (mmu_b_din_w),
+        .md_a_en   (mmd_a_en_w),
+        .md_a_we  (mmd_a_we_w),
+        .md_a_addr(mmd_a_addr_w),
+        .md_a_din (mmd_a_din_w),
+        .md_a_dout(mmd_a_dout),
+        .md_b_we  (mmd_b_we_w),
+        .md_b_addr(mmd_b_addr_w),
+        .md_b_din (mmd_b_din_w)
+    );
+
+    poly_memory_updown #(.DEPTH(1024), .DATA_W(DATA_W), .ADDR_W(ADDR_W)) u_pm_rand (
+        .clk      (clk),
+        .mu_a_en   (rmu_a_en_w),
+        .mu_a_we  (rmu_a_we_w),
+        .mu_a_addr(rmu_a_addr_w),
+        .mu_a_din (rmu_a_din_w),
+        .mu_a_dout(rmu_a_dout),
+        .mu_b_we  (4'b0),
+        .mu_b_addr({4*ADDR_W{1'b0}}),
+        .mu_b_din ({4*DATA_W{1'b0}}),
+        .md_a_en   (rmd_a_en_w),
+        .md_a_we  (rmd_a_we_w),
+        .md_a_addr(rmd_a_addr_w),
+        .md_a_din (rmd_a_din_w),
+        .md_a_dout(rmd_a_dout),
+        .md_b_we  (4'b0),
+        .md_b_addr({4*ADDR_W{1'b0}}),
+        .md_b_din ({4*DATA_W{1'b0}})
+    );
+
     // Select read data per SBU per side
     function [DATA_W-1:0] sel_dout;
         input [4*DATA_W-1:0] bus;
@@ -366,18 +458,28 @@ module phoenix_top #(
     endfunction
 
     reg       host_mem_d;
+    reg [1:0] host_region_d;
     reg [1:0] host_bank_d;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             host_mem_d  <= 1'b0;
+            host_region_d <= 2'b0;
             host_bank_d <= 2'b0;
         end else if (host_active) begin
             host_mem_d  <= host_mem;
+            host_region_d <= host_region;
             host_bank_d <= host_bank;
         end
     end
-    assign host_dout = host_mem_d ? sel_dout(md_a_dout, host_bank_d)
-                                  : sel_dout(mu_a_dout, host_bank_d);
+    wire [DATA_W-1:0] host_dout_data = host_mem_d ? sel_dout(md_a_dout, host_bank_d)
+                                                  : sel_dout(mu_a_dout, host_bank_d);
+    wire [DATA_W-1:0] host_dout_mask = host_mem_d ? sel_dout(mmd_a_dout, host_bank_d)
+                                                  : sel_dout(mmu_a_dout, host_bank_d);
+    wire [DATA_W-1:0] host_dout_rand = host_mem_d ? sel_dout(rmd_a_dout, host_bank_d)
+                                                  : sel_dout(rmu_a_dout, host_bank_d);
+    assign host_dout = (host_region_d == 2'd1) ? host_dout_mask :
+                       (host_region_d == 2'd2) ? host_dout_rand :
+                                                  host_dout_data;
 
     reg [1:0] bk0a_d, bk0b_d, bk1a_d, bk1b_d;
     reg       pe_valid_in;
@@ -399,17 +501,38 @@ module phoenix_top #(
     wire [DATA_W-1:0] md0b = sel_dout(md_a_dout, bk0b_d);
     wire [DATA_W-1:0] md1a = sel_dout(md_a_dout, bk1a_d);
     wire [DATA_W-1:0] md1b = sel_dout(md_a_dout, bk1b_d);
+    wire [DATA_W-1:0] mmu0a = sel_dout(mmu_a_dout, bk0a_d);
+    wire [DATA_W-1:0] mmu0b = sel_dout(mmu_a_dout, bk0b_d);
+    wire [DATA_W-1:0] mmu1a = sel_dout(mmu_a_dout, bk1a_d);
+    wire [DATA_W-1:0] mmu1b = sel_dout(mmu_a_dout, bk1b_d);
+    wire [DATA_W-1:0] mmd0a = sel_dout(mmd_a_dout, bk0a_d);
+    wire [DATA_W-1:0] mmd0b = sel_dout(mmd_a_dout, bk0b_d);
+    wire [DATA_W-1:0] mmd1a = sel_dout(mmd_a_dout, bk1a_d);
+    wire [DATA_W-1:0] mmd1b = sel_dout(mmd_a_dout, bk1b_d);
+    wire [DATA_W-1:0] rnd0 = sel_dout(rmu_a_dout, bk0a_d);
+    wire [DATA_W-1:0] rnd1 = is_mlkem_pwm ? sel_dout(rmd_a_dout, bk0a_d)
+                                           : sel_dout(rmu_a_dout, bk1a_d);
 
     wire [DATA_W-1:0] side0a = ctl_mem_down ? md0a : mu0a;
     wire [DATA_W-1:0] side0b = ctl_mem_down ? md0b : mu0b;
     wire [DATA_W-1:0] side1a = ctl_mem_down ? md1a : mu1a;
     wire [DATA_W-1:0] side1b = ctl_mem_down ? md1b : mu1b;
+    wire [DATA_W-1:0] side0a_m = ctl_mem_down ? mmd0a : mmu0a;
+    wire [DATA_W-1:0] side0b_m = ctl_mem_down ? mmd0b : mmu0b;
+    wire [DATA_W-1:0] side1a_m = ctl_mem_down ? mmd1a : mmu1a;
+    wire [DATA_W-1:0] side1b_m = ctl_mem_down ? mmd1b : mmu1b;
     wire [11:0] pwm_f0 = mu0a[11:0];
     wire [11:0] pwm_f1 = mu0a[16 +: 12];
     wire [11:0] pwm_g0 = md0a[11:0];
     wire [11:0] pwm_g1 = md0a[16 +: 12];
+    wire [11:0] pwm_f0_m = mmu0a[11:0];
+    wire [11:0] pwm_f1_m = mmu0a[16 +: 12];
+    wire [11:0] pwm_g0_m = mmd0a[11:0];
+    wire [11:0] pwm_g1_m = mmd0a[16 +: 12];
     wire [DATA_W-1:0] pwm0_a = {4'b0, pwm_g0, 4'b0, pwm_f0};
     wire [DATA_W-1:0] pwm0_b = {4'b0, pwm_g1, 4'b0, pwm_f1};
+    wire [DATA_W-1:0] pwm0_a_m = {4'b0, pwm_g0_m, 4'b0, pwm_f0_m};
+    wire [DATA_W-1:0] pwm0_b_m = {4'b0, pwm_g1_m, 4'b0, pwm_f1_m};
 
     wire [DATA_W-1:0] sbu0_a = is_mlkem_pwm ? pwm0_a :
                                 is_mldsa_pwm ? mu0a  : side0a;
@@ -417,6 +540,12 @@ module phoenix_top #(
                                 is_mldsa_pwm ? md0a  : side0b;
     wire [DATA_W-1:0] sbu1_a = is_mldsa_pwm ? mu1a : side1a;
     wire [DATA_W-1:0] sbu1_b = is_mldsa_pwm ? md1a : side1b;
+    wire [DATA_W-1:0] sbu0_a_m = is_mlkem_pwm ? pwm0_a_m :
+                                  is_mldsa_pwm ? 32'b0 : side0a_m;
+    wire [DATA_W-1:0] sbu0_b_m = is_mlkem_pwm ? pwm0_b_m :
+                                  is_mldsa_pwm ? mmd0a : side0b_m;
+    wire [DATA_W-1:0] sbu1_a_m = is_mldsa_pwm ? 32'b0 : side1a_m;
+    wire [DATA_W-1:0] sbu1_b_m = is_mldsa_pwm ? mmd1a : side1b_m;
 
     function [7:0] ntt_ct_addr;
         input [INDEX_W-1:0] index;
@@ -472,7 +601,6 @@ module phoenix_top #(
     wire [INDEX_W-1:0] idx1_a_local = idx1_a - ctl_init_address;
 
     wire is_intt_gs = (ctl_sel0 == `SBU_INTT_GS);
-    wire is_mldsa_now = ctl_sel0[8];
     wire is_mldsa_intt = (ctl_sel0 == `SBU_MLDSA_INTT);
     wire [7:0] kem_addr0 = is_intt_gs ? ntt_gs_addr(idx0_a_local, ctl_layer)
                                       : ntt_ct_addr(idx0_a_local, ctl_layer);
@@ -505,6 +633,8 @@ module phoenix_top #(
                                 is_mldsa_pwm ? mu0a : cm_q0;
     wire [DATA_W-1:0] sbu1_c = is_mlkem_pwm ? cm_pwm :
                                 is_mldsa_pwm ? mu1a : cm_q1;
+    wire [DATA_W-1:0] sbu0_c_m = is_mldsa_pwm ? mmu0a : 32'b0;
+    wire [DATA_W-1:0] sbu1_c_m = is_mldsa_pwm ? mmu1a : 32'b0;
 
     // ---- Processing Element ----
     sbu_pair_pe u_pe (
@@ -515,17 +645,29 @@ module phoenix_top #(
         .sbu0_a         (sbu0_a),
         .sbu0_b         (sbu0_b),
         .sbu0_c         (sbu0_c),
+        .sbu0_a_mask    (sbu0_a_m),
+        .sbu0_b_mask    (sbu0_b_m),
+        .sbu0_c_mask    (sbu0_c_m),
+        .sbu0_rand      (rnd0),
         .sel1           (ctl_sel1),
         .valid1_in      (pe_valid_in),
         .sbu1_a         (sbu1_a),
         .sbu1_b         (sbu1_b),
         .sbu1_c         (sbu1_c),
+        .sbu1_a_mask    (sbu1_a_m),
+        .sbu1_b_mask    (sbu1_b_m),
+        .sbu1_c_mask    (sbu1_c_m),
+        .sbu1_rand      (rnd1),
         .pwm_chain      (ctl_pwm_chain),
         .sbu0_out0      (sbu0_o0),
         .sbu0_out1      (sbu0_o1),
+        .sbu0_mask0     (sbu0_m0),
+        .sbu0_mask1     (sbu0_m1),
         .sbu0_valid_out (sbu0_vo),
         .sbu1_out0      (sbu1_o0),
         .sbu1_out1      (sbu1_o1),
+        .sbu1_mask0     (sbu1_m0),
+        .sbu1_mask1     (sbu1_m1),
         .sbu1_valid_out (sbu1_vo)
     );
 

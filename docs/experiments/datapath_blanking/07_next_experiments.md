@@ -25,6 +25,9 @@ Stage 6b가 ML-KEM에서 매우 좋은 결과를 냈기 때문에 두 질문이 
   정했다. Original baseline 대비 six-op max `|t|`가 모두 낮아졌기 때문이다.
 - Stage 6c candidate는 Stage 4b control 대비 worst를 `mldsa_intt 122.083 -> 99.696`,
   repeat에서 `102.864`까지 낮췄지만, `mlkem_intt` 악화가 남아 final RTL에는 적용하지 않는다.
+- 그 다음 큰 방향으로 ML-KEM first-order arithmetic masking을 구현했다. 상세는
+  `docs/experiments/arithmetic_masking/README.md`에 둔다. 이 실험은 inactive dummy가
+  아니라 active ML-KEM arithmetic을 two-share로 계산하는 별도 계열이다.
 
 ## 현재 해석
 

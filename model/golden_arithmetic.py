@@ -27,6 +27,38 @@ def modq_mul(a: int, b: int) -> int:
     return (a * b) % KEM_Q
 
 
+def pack_mlkem_word(lo: int, hi: int) -> int:
+    return ((hi % KEM_Q) << 16) | (lo % KEM_Q)
+
+
+def unpack_mlkem_word(word: int) -> tuple[int, int]:
+    return int(word) & 0xFFFF, (int(word) >> 16) & 0xFFFF
+
+
+def mlkem_split_word(word: int, mask_word: int) -> tuple[int, int]:
+    lo, hi = unpack_mlkem_word(word)
+    mlo, mhi = unpack_mlkem_word(mask_word)
+    share0 = pack_mlkem_word((lo - mlo) % KEM_Q, (hi - mhi) % KEM_Q)
+    share1 = pack_mlkem_word(mlo, mhi)
+    return share0, share1
+
+
+def mlkem_recombine_word(share0: int, share1: int) -> int:
+    lo0, hi0 = unpack_mlkem_word(share0)
+    lo1, hi1 = unpack_mlkem_word(share1)
+    return pack_mlkem_word((lo0 + lo1) % KEM_Q, (hi0 + hi1) % KEM_Q)
+
+
+def mldsa_split_word(word: int, mask_word: int) -> tuple[int, int]:
+    share1 = mask_word % MLDSA_Q
+    share0 = (word - share1) % MLDSA_Q
+    return share0, share1
+
+
+def mldsa_recombine_word(share0: int, share1: int) -> int:
+    return (share0 + share1) % MLDSA_Q
+
+
 def mldsa_add(a: int, b: int) -> int:
     return (a + b) % MLDSA_Q
 

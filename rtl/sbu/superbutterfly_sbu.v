@@ -15,22 +15,34 @@ module superbutterfly_sbu #(
     input  wire [31:0] a_i,
     input  wire [31:0] b_i,
     input  wire [31:0] c_i,
+    input  wire [31:0] a_mask_i,
+    input  wire [31:0] b_mask_i,
+    input  wire [31:0] c_mask_i,
+    input  wire [31:0] rand_i,
     output wire        valid_o,
     output wire [31:0] y0_o,
-    output wire [31:0] y1_o
+    output wire [31:0] y1_o,
+    output wire [31:0] y0_mask_o,
+    output wire [31:0] y1_mask_o
 );
     generate
         if (USE_REF != 0) begin : g_ref
             superbutterfly_sbu_ref u_sbu (
                 .clk_i(clk_i), .rst_ni(rst_ni), .valid_i(valid_i), .sel_i(sel_i),
                 .a_i(a_i), .b_i(b_i), .c_i(c_i),
-                .valid_o(valid_o), .y0_o(y0_o), .y1_o(y1_o)
+                .a_mask_i(a_mask_i), .b_mask_i(b_mask_i), .c_mask_i(c_mask_i),
+                .rand_i(rand_i),
+                .valid_o(valid_o), .y0_o(y0_o), .y1_o(y1_o),
+                .y0_mask_o(y0_mask_o), .y1_mask_o(y1_mask_o)
             );
         end else begin : g_routed
             superbutterfly_sbu_routed u_sbu (
                 .clk_i(clk_i), .rst_ni(rst_ni), .valid_i(valid_i), .sel_i(sel_i),
                 .a_i(a_i), .b_i(b_i), .c_i(c_i),
-                .valid_o(valid_o), .y0_o(y0_o), .y1_o(y1_o)
+                .a_mask_i(a_mask_i), .b_mask_i(b_mask_i), .c_mask_i(c_mask_i),
+                .rand_i(rand_i),
+                .valid_o(valid_o), .y0_o(y0_o), .y1_o(y1_o),
+                .y0_mask_o(y0_mask_o), .y1_mask_o(y1_mask_o)
             );
         end
     endgenerate
