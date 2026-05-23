@@ -10,9 +10,15 @@ module mldsa_modsub32 (
     input  wire [31:0] b_i,
     output wire [31:0] c_o
 );
-    wire [32:0] diff_pos = {1'b0, a_i} - {1'b0, b_i};
-    wire [32:0] diff_wrap = {1'b0, a_i} + {1'b0, `MLDSA_Q} - {1'b0, b_i};
-    assign c_o = (a_i >= b_i) ? diff_pos[31:0] : diff_wrap[31:0];
+    localparam [23:0] Q24 = 24'd8380417;
+
+    wire [23:0] a_v = {1'b0, a_i[22:0]};
+    wire [23:0] b_v = {1'b0, b_i[22:0]};
+    wire [23:0] raw = a_v + Q24 - b_v;
+    wire [23:0] raw_minus_q = raw - Q24;
+    wire [23:0] red = (raw >= Q24) ? raw_minus_q : raw;
+
+    assign c_o = {9'b0, red[22:0]};
 endmodule
 
 `default_nettype wire

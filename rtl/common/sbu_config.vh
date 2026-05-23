@@ -28,4 +28,9 @@
 `define SBU_INTT(sel)    (sel[6])
 `define SBU_PWMSEL(sel)  (sel[5])
 
+// Current routed SBU external latency. The Phase-A multiplier/reducer is
+// internally pipelined so the host/top-level alignment derives from here.
+`define SBU_LATENCY       13
+`define SBU_COMP3_LATENCY 8
+
 `endif // SBU_CONFIG_VH

@@ -13,7 +13,8 @@
 
 module delay_line #(
     parameter integer WIDTH = 32,
-    parameter integer DEPTH = 1
+    parameter integer DEPTH = 1,
+    parameter integer RESETTABLE = 1
 )(
     input  wire                 clk_i,
     input  wire                 rst_ni,
@@ -25,6 +26,15 @@ module delay_line #(
         if (DEPTH == 0) begin : g_passthrough
             // 지연 0 — 조합 통과
             assign d_o = d_i;
+        end else if (RESETTABLE == 0) begin : g_shift_noreset
+            integer i;
+            reg [WIDTH-1:0] pipe [0:DEPTH-1];
+            always @(posedge clk_i) begin
+                pipe[0] <= d_i;
+                for (i = 1; i < DEPTH; i = i + 1)
+                    pipe[i] <= pipe[i-1];
+            end
+            assign d_o = pipe[DEPTH-1];
         end else begin : g_shift
             integer i;
             reg [WIDTH-1:0] pipe [0:DEPTH-1];

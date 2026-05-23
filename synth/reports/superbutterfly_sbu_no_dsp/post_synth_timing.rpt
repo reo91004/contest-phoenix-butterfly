@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2025.2 (lin64) Build 6299465 Fri Nov 14 12:34:56 MST 2025
-| Date         : Tue May 19 20:33:56 2026
+| Date         : Thu May 21 20:20:40 2026
 | Host         : reo running 64-bit Ubuntu 22.04.5 LTS
 | Command      : report_timing_summary -file reports/superbutterfly_sbu_no_dsp/post_synth_timing.rpt
 | Design       : superbutterfly_sbu
@@ -49,10 +49,10 @@ check_timing report
 
 Table of Contents
 -----------------
-1. checking no_clock (494)
+1. checking no_clock (1441)
 2. checking constant_clock (0)
 3. checking pulse_width_clock (0)
-4. checking unconstrained_internal_endpoints (775)
+4. checking unconstrained_internal_endpoints (1991)
 5. checking no_input_delay (107)
 6. checking no_output_delay (65)
 7. checking multiple_clock (0)
@@ -62,9 +62,9 @@ Table of Contents
 11. checking partial_output_delay (0)
 12. checking latch_loops (0)
 
-1. checking no_clock (494)
---------------------------
- There are 494 register/latch pins with no clock driven by root clock pin: clk_i (HIGH)
+1. checking no_clock (1441)
+---------------------------
+ There are 1441 register/latch pins with no clock driven by root clock pin: clk_i (HIGH)
 
 
 2. checking constant_clock (0)
@@ -77,9 +77,9 @@ Table of Contents
  There are 0 register/latch pins which need pulse_width check
 
 
-4. checking unconstrained_internal_endpoints (775)
---------------------------------------------------
- There are 775 pins that are not constrained for maximum delay. (HIGH)
+4. checking unconstrained_internal_endpoints (1991)
+---------------------------------------------------
+ There are 1991 pins that are not constrained for maximum delay. (HIGH)
 
  There are 0 pins that are not constrained for maximum delay due to constant clock.
 

@@ -16,7 +16,7 @@ smoke test이다.
 | `tb_mldsa_modarith.sv` | ML-DSA add/sub/div2 | `8380417` modulo arithmetic |
 | `tb_comp1_comp2_comp4.sv` | COMP1/2/4 | ML-KEM lane 및 ML-DSA 32비트 arithmetic |
 | `tb_comp3_agile_modmul.sv` | COMP3 | ML-KEM Barrett product 및 ML-DSA Montgomery product |
-| `tb_superbutterfly_all_modes.sv` | SBU | routed/reference/golden 일치, latency 8 |
+| `tb_superbutterfly_all_modes.sv` | SBU | routed/reference/golden 일치, latency 13 |
 | `tb_phoenix_core.sv` | `phoenix_top` | command completion 및 cycle telemetry |
 | `tb_phoenix_host_io.sv` | host memory port | idle read/write 및 busy gating |
 | `tb_phoenix_cw305_wrapper.sv` | CW305 bridge | memory command 및 start/status smoke |
@@ -34,12 +34,12 @@ smoke test이다.
 
 | Operation | Cycles |
 |---|---:|
-| `mlkem_ntt` | 248 |
-| `mlkem_intt` | 248 |
-| `mlkem_pwm` | 149 |
-| `mldsa_ntt` | 538 |
-| `mldsa_intt` | 538 |
-| `mldsa_pwm` | 140 |
+| `mlkem_ntt` | 253 |
+| `mlkem_intt` | 253 |
+| `mlkem_pwm` | 159 |
+| `mldsa_ntt` | 543 |
+| `mldsa_intt` | 543 |
+| `mldsa_pwm` | 145 |
 
 `tb_phoenix_core.sv`는 `instr[8:7] = 10`, `11`에 대해서 즉시 종료되는
 reserved-field smoke도 함께 수행한다.

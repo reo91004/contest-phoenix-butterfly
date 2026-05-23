@@ -5,10 +5,11 @@
 #   vivado -mode batch -source synth/vivado_impl_zynq7020.tcl
 #   vivado -mode batch -source synth/vivado_impl_zynq7020.tcl -tclargs superbutterfly_sbu 8.000
 #   vivado -mode batch -source synth/vivado_impl_zynq7020.tcl -tclargs phoenix_top 30.000
+#   vivado -mode batch -source synth/vivado_impl_zynq7020.tcl -tclargs superbutterfly_sbu 8.000 xc7a100tftg256-2
 
 set TOP    [expr {[llength $argv] >= 1 ? [lindex $argv 0] : "superbutterfly_sbu"}]
 set PERIOD [expr {[llength $argv] >= 2 ? [lindex $argv 1] : "8.000"}]
-set PART   "xc7z020clg400-1"
+set PART   [expr {[llength $argv] >= 3 ? [lindex $argv 2] : "xc7z020clg400-1"}]
 file mkdir reports/${TOP}_zynq7020
 
 read_verilog [glob ../rtl/common/*.v]

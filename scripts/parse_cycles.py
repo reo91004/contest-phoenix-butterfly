@@ -12,11 +12,11 @@ Usage
     python3 scripts/parse_cycles.py sim.log --csv > reports_phoenix/cycles.csv
 
 Current RTL smoke-cycle reference:
-    SBU latency           : 8
-    ML-KEM NTT / INTT     : 248
-    ML-KEM PWM            : 149
-    ML-DSA NTT / INTT     : 538
-    ML-DSA PWM            : 140
+    SBU latency           : 13
+    ML-KEM NTT / INTT     : 253
+    ML-KEM PWM            : 159
+    ML-DSA NTT / INTT     : 543
+    ML-DSA PWM            : 145
 """
 from __future__ import annotations
 import argparse
@@ -28,13 +28,13 @@ import sys
 _RE_LINE = re.compile(r"\[PHOENIX-CYCLES\]\s+op=(\S+)\s+cycles=(\d+)")
 
 RTL_REFERENCE = {
-    "sbu_latency":              8,
-    "mlkem_ntt":                248,
-    "mlkem_intt":               248,
-    "mlkem_pwm":                149,
-    "mldsa_ntt":                538,
-    "mldsa_intt":               538,
-    "mldsa_pwm":                140,
+    "sbu_latency":              13,
+    "mlkem_ntt":                253,
+    "mlkem_intt":               253,
+    "mlkem_pwm":                159,
+    "mldsa_ntt":                543,
+    "mldsa_intt":               543,
+    "mldsa_pwm":                145,
 }
 
 

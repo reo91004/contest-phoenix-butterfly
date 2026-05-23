@@ -17,7 +17,7 @@ CASES = (
     ("mldsa_256_words", 256),
 )
 
-WB_LAT = 9
+WB_LAT = 14
 INIT_OFFSETS = (0, 1024, 2048, 3072)
 
 

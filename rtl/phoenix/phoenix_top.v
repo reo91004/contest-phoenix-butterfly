@@ -50,7 +50,7 @@ module phoenix_top #(
     output wire         dbg_pe_v1
 );
 
-    localparam integer WB_LAT  = 9;  // BRAM read latency + SBU pipeline
+    localparam integer WB_LAT  = `SBU_LATENCY + 1;  // BRAM read latency + SBU pipeline
 
     // ---- Control ----
     wire [8:0]  ctl_sel0, ctl_sel1;
@@ -216,49 +216,37 @@ module phoenix_top #(
     wire [DATA_W-1:0] sbu0_o0, sbu0_o1, sbu1_o0, sbu1_o1;
     wire              sbu0_vo, sbu1_vo;
 
-    (* shreg_extract = "no" *) reg [1:0]        wb_b0 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [1:0]        wb_b1 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [1:0]        wb_b2 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [1:0]        wb_b3 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [ADDR_W-1:0] wb_a0 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [ADDR_W-1:0] wb_a1 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [ADDR_W-1:0] wb_a2 [0:WB_LAT-1];
-    (* shreg_extract = "no" *) reg [ADDR_W-1:0] wb_a3 [0:WB_LAT-1];
+    reg [1:0]        wb_b0 [0:WB_LAT-1];
+    reg [1:0]        wb_b1 [0:WB_LAT-1];
+    reg [1:0]        wb_b2 [0:WB_LAT-1];
+    reg [1:0]        wb_b3 [0:WB_LAT-1];
+    reg [ADDR_W-1:0] wb_a0 [0:WB_LAT-1];
+    reg [ADDR_W-1:0] wb_a1 [0:WB_LAT-1];
+    reg [ADDR_W-1:0] wb_a2 [0:WB_LAT-1];
+    reg [ADDR_W-1:0] wb_a3 [0:WB_LAT-1];
     integer wi;
 
-    localparam integer PWM_WB_LAT = 18;
-    (* shreg_extract = "no" *) reg [1:0]        pwm_wb_b0 [0:PWM_WB_LAT-1];
-    (* shreg_extract = "no" *) reg [ADDR_W-1:0] pwm_wb_a0 [0:PWM_WB_LAT-1];
+    localparam integer PWM_WB_LAT = (`SBU_LATENCY * 2) + 2;
+    reg [1:0]        pwm_wb_b0 [0:PWM_WB_LAT-1];
+    reg [ADDR_W-1:0] pwm_wb_a0 [0:PWM_WB_LAT-1];
     integer pwi;
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            for (wi = 0; wi < WB_LAT; wi = wi + 1) begin
-                wb_b0[wi] <= 2'b0; wb_b1[wi] <= 2'b0; wb_b2[wi] <= 2'b0; wb_b3[wi] <= 2'b0;
-                wb_a0[wi] <= {ADDR_W{1'b0}}; wb_a1[wi] <= {ADDR_W{1'b0}};
-                wb_a2[wi] <= {ADDR_W{1'b0}}; wb_a3[wi] <= {ADDR_W{1'b0}};
-            end
-            for (pwi = 0; pwi < PWM_WB_LAT; pwi = pwi + 1) begin
-                pwm_wb_b0[pwi] <= 2'b0;
-                pwm_wb_a0[pwi] <= {ADDR_W{1'b0}};
-            end
-        end else begin
-            wb_b0[0] <= bk0a; wb_a0[0] <= ad0a;
-            wb_b1[0] <= bk0b; wb_a1[0] <= ad0b;
-            wb_b2[0] <= bk1a; wb_a2[0] <= ad1a;
-            wb_b3[0] <= bk1b; wb_a3[0] <= ad1b;
-            for (wi = 1; wi < WB_LAT; wi = wi + 1) begin
-                wb_b0[wi] <= wb_b0[wi-1]; wb_a0[wi] <= wb_a0[wi-1];
-                wb_b1[wi] <= wb_b1[wi-1]; wb_a1[wi] <= wb_a1[wi-1];
-                wb_b2[wi] <= wb_b2[wi-1]; wb_a2[wi] <= wb_a2[wi-1];
-                wb_b3[wi] <= wb_b3[wi-1]; wb_a3[wi] <= wb_a3[wi-1];
-            end
-            pwm_wb_b0[0] <= bk0a;
-            pwm_wb_a0[0] <= ad0a;
-            for (pwi = 1; pwi < PWM_WB_LAT; pwi = pwi + 1) begin
-                pwm_wb_b0[pwi] <= pwm_wb_b0[pwi-1];
-                pwm_wb_a0[pwi] <= pwm_wb_a0[pwi-1];
-            end
+    always @(posedge clk) begin
+        wb_b0[0] <= bk0a; wb_a0[0] <= ad0a;
+        wb_b1[0] <= bk0b; wb_a1[0] <= ad0b;
+        wb_b2[0] <= bk1a; wb_a2[0] <= ad1a;
+        wb_b3[0] <= bk1b; wb_a3[0] <= ad1b;
+        for (wi = 1; wi < WB_LAT; wi = wi + 1) begin
+            wb_b0[wi] <= wb_b0[wi-1]; wb_a0[wi] <= wb_a0[wi-1];
+            wb_b1[wi] <= wb_b1[wi-1]; wb_a1[wi] <= wb_a1[wi-1];
+            wb_b2[wi] <= wb_b2[wi-1]; wb_a2[wi] <= wb_a2[wi-1];
+            wb_b3[wi] <= wb_b3[wi-1]; wb_a3[wi] <= wb_a3[wi-1];
+        end
+        pwm_wb_b0[0] <= bk0a;
+        pwm_wb_a0[0] <= ad0a;
+        for (pwi = 1; pwi < PWM_WB_LAT; pwi = pwi + 1) begin
+            pwm_wb_b0[pwi] <= pwm_wb_b0[pwi-1];
+            pwm_wb_a0[pwi] <= pwm_wb_a0[pwi-1];
         end
     end
 

@@ -79,7 +79,7 @@ for TB in $SEL_TBS; do
     else
         res="BUILD-FAIL"; rc_all=1
     fi
-    line=$(grep -hE '\] (checks|.*)=.*(PASS|FAIL)|\] PASS|PHOENIX-CYCLES|latency = 8' "$LOG" | tail -1)
+    line=$(grep -hE '\] (checks|.*)=.*(PASS|FAIL)|\] PASS|PHOENIX-CYCLES|latency = [0-9]+' "$LOG" | tail -1)
     printf "%-32s %-10s %s\n" "$TB" "$res" "$line" | tee -a "$SUMMARY"
 done
 

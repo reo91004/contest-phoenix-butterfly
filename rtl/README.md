@@ -34,4 +34,4 @@
 - ML-KEM: `SBU_NTT_CT`, `SBU_INTT_GS`, `SBU_PWM0`, `SBU_PWM1`, `SBU_MOD_ADD`.
 - ML-DSA: `SBU_MLDSA_NTT`, `SBU_MLDSA_INTT`, `SBU_MLDSA_PWM`.
 
-Routed SBU의 외부 latency는 8 cycle을 유지한다.
+Routed SBU의 외부 latency는 13 cycle이다.

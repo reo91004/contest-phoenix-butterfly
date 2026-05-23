@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // superbutterfly_sbu.v
 // SBU public wrapper (핸드오버 §5.6,§12). USE_REF=0 → routed (합성 기본),
-// USE_REF=1 → reference. 외부 latency = 8 cycle, 두 구현 equivalence 보장.
+// USE_REF=1 → reference. 외부 latency = `SBU_LATENCY cycle.
 // -----------------------------------------------------------------------------
 `default_nettype none
 

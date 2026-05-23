@@ -39,7 +39,7 @@ module sbu_pair_pe (
     output wire        sbu1_valid_out
 );
 
-    // ----- SBU0 ----- (신 superbutterfly_sbu, routed 기본, latency=8)
+    // ----- SBU0 ----- (신 superbutterfly_sbu, routed 기본)
     superbutterfly_sbu u_sbu0 (
         .clk_i    (clk),
         .rst_ni   (rst_n),
@@ -58,25 +58,23 @@ module sbu_pair_pe (
     // PWM1 zeta belongs to the same input transaction as the PWM0 data, so it
     // follows an equal-depth delay pipe (SBU latency + this cascade register).
     reg [31:0] cascade_a_r, cascade_b_r;
-    (* shreg_extract = "no" *) reg [31:0] cascade_c_pipe [0:8];
+    reg [31:0] cascade_c_pipe [0:`SBU_LATENCY];
     reg        cascade_valid_r;
     integer ci;
+    always @(posedge clk) begin
+        cascade_a_r <= sbu0_out0;
+        cascade_b_r <= sbu0_out1;
+        cascade_c_pipe[0] <= sbu0_c;
+        for (ci = 1; ci <= `SBU_LATENCY; ci = ci + 1) begin
+            cascade_c_pipe[ci] <= cascade_c_pipe[ci-1];
+        end
+    end
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            cascade_a_r     <= 32'b0;
-            cascade_b_r     <= 32'b0;
             cascade_valid_r <= 1'b0;
-            for (ci = 0; ci < 9; ci = ci + 1) begin
-                cascade_c_pipe[ci] <= 32'b0;
-            end
         end else begin
-            cascade_a_r     <= sbu0_out0;
-            cascade_b_r     <= sbu0_out1;
             cascade_valid_r <= sbu0_valid_out;
-            cascade_c_pipe[0] <= sbu0_c;
-            for (ci = 1; ci < 9; ci = ci + 1) begin
-                cascade_c_pipe[ci] <= cascade_c_pipe[ci-1];
-            end
         end
     end
 
@@ -84,7 +82,7 @@ module sbu_pair_pe (
     // (a, b) inputs. The packing convention is out0={s1,s0}, out1={m1,m0}.
     wire [31:0] sbu1_a_eff = pwm_chain ? cascade_a_r : sbu1_a;
     wire [31:0] sbu1_b_eff = pwm_chain ? cascade_b_r : sbu1_b;
-    wire [31:0] sbu1_c_eff = pwm_chain ? cascade_c_pipe[8] : sbu1_c;
+    wire [31:0] sbu1_c_eff = pwm_chain ? cascade_c_pipe[`SBU_LATENCY] : sbu1_c;
     wire        sbu1_valid_eff = pwm_chain ? cascade_valid_r : valid1_in;
 
     superbutterfly_sbu u_sbu1 (

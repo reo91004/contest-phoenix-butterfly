@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // superbutterfly_sbu_ref.v
 // Functional SBU reference for ML-KEM and ML-DSA modes. It mirrors the routed
-// SBU equations directly and delays outputs by eight cycles.
+// SBU equations directly and delays outputs by `SBU_LATENCY cycles.
 // -----------------------------------------------------------------------------
 `include "sbu_config.vh"
 `default_nettype none
@@ -157,9 +157,9 @@ module superbutterfly_sbu_ref (
         endcase
     end
 
-    delay_line #(.WIDTH(1),  .DEPTH(8)) u_dv (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(valid_i), .d_o(valid_o));
-    delay_line #(.WIDTH(32), .DEPTH(8)) u_d0 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y0c),     .d_o(y0_o));
-    delay_line #(.WIDTH(32), .DEPTH(8)) u_d1 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y1c),     .d_o(y1_o));
+    delay_line #(.WIDTH(1),  .DEPTH(`SBU_LATENCY)) u_dv (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(valid_i), .d_o(valid_o));
+    delay_line #(.WIDTH(32), .DEPTH(`SBU_LATENCY)) u_d0 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y0c),     .d_o(y0_o));
+    delay_line #(.WIDTH(32), .DEPTH(`SBU_LATENCY)) u_d1 (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(y1c),     .d_o(y1_o));
 endmodule
 
 `default_nettype wire

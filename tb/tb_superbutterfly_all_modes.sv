@@ -161,16 +161,16 @@ module tb_superbutterfly_all_modes;
         @(negedge clk); vin = 0; sel = 0; a = 0; b = 0; c = 0;
         latency_meas = 0;
         while (!vrf && latency_meas < 32) begin @(posedge clk); latency_meas = latency_meas + 1; end
-        if (latency_meas !== 8) begin errors = errors + 1; $display("[FAIL] ref latency=%0d", latency_meas); end
-        else $display("[tb_sbu] ref latency = 8 OK");
+        if (latency_meas !== `SBU_LATENCY) begin errors = errors + 1; $display("[FAIL] ref latency=%0d", latency_meas); end
+        else $display("[tb_sbu] ref latency = %0d OK", `SBU_LATENCY);
 
         repeat (12) @(posedge clk);
         @(negedge clk); sel = `SBU_MOD_ADD; a = {16'd7,16'd5}; b = {16'd9,16'd3}; c = 0; vin = 1;
         @(negedge clk); vin = 0;
         latency_meas = 0;
         while (!vrt && latency_meas < 32) begin @(posedge clk); latency_meas = latency_meas + 1; end
-        if (latency_meas !== 8) begin errors = errors + 1; $display("[FAIL] routed latency=%0d", latency_meas); end
-        else $display("[tb_sbu] routed latency = 8 OK");
+        if (latency_meas !== `SBU_LATENCY) begin errors = errors + 1; $display("[FAIL] routed latency=%0d", latency_meas); end
+        else $display("[tb_sbu] routed latency = %0d OK", `SBU_LATENCY);
 
         repeat (12) @(posedge clk);
         cyc = 0;
@@ -192,14 +192,14 @@ module tb_superbutterfly_all_modes;
             h_b[cyc % 1024] = b;
             h_c[cyc % 1024] = c;
             h_v[cyc % 1024] = 1;
-            if (cyc >= 8 && vrf) begin
-                golden(h_sel[(cyc-8) % 1024], h_a[(cyc-8) % 1024],
-                       h_b[(cyc-8) % 1024], h_c[(cyc-8) % 1024], g0e, g1e);
+            if (cyc >= `SBU_LATENCY && vrf) begin
+                golden(h_sel[(cyc-`SBU_LATENCY) % 1024], h_a[(cyc-`SBU_LATENCY) % 1024],
+                       h_b[(cyc-`SBU_LATENCY) % 1024], h_c[(cyc-`SBU_LATENCY) % 1024], g0e, g1e);
                 checks = checks + 1;
                 if (y0rf !== y0rt || y1rf !== y1rt || y0rf !== g0e || y1rf !== g1e) begin
                     errors = errors + 1;
                     if (errors <= 20) $display("[FAIL] cyc=%0d sel=%b ref=(%h,%h) rt=(%h,%h) exp=(%h,%h)",
-                                               cyc, h_sel[(cyc-8) % 1024], y0rf, y1rf, y0rt, y1rt, g0e, g1e);
+                                               cyc, h_sel[(cyc-`SBU_LATENCY) % 1024], y0rf, y1rf, y0rt, y1rt, g0e, g1e);
                 end
             end
             cyc = cyc + 1;
@@ -208,9 +208,9 @@ module tb_superbutterfly_all_modes;
             @(negedge clk);
             vin = 0;
             h_v[cyc % 1024] = 0;
-            if (cyc >= 8 && h_v[(cyc-8) % 1024] && vrf) begin
-                golden(h_sel[(cyc-8) % 1024], h_a[(cyc-8) % 1024],
-                       h_b[(cyc-8) % 1024], h_c[(cyc-8) % 1024], g0e, g1e);
+            if (cyc >= `SBU_LATENCY && h_v[(cyc-`SBU_LATENCY) % 1024] && vrf) begin
+                golden(h_sel[(cyc-`SBU_LATENCY) % 1024], h_a[(cyc-`SBU_LATENCY) % 1024],
+                       h_b[(cyc-`SBU_LATENCY) % 1024], h_c[(cyc-`SBU_LATENCY) % 1024], g0e, g1e);
                 checks = checks + 1;
                 if (y0rf !== y0rt || y1rf !== y1rt || y0rf !== g0e || y1rf !== g1e) begin
                     errors = errors + 1;

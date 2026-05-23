@@ -60,15 +60,18 @@ module phoenix_control_unit (
     reg [4:0] drain_cycles;
     reg       descending_layers;
 
+    localparam integer DRAIN_SINGLE = `SBU_LATENCY + 1;
+    localparam integer DRAIN_CHAIN  = (`SBU_LATENCY * 2) + 2;
+
     function [4:0] op_drain_cycles;
         input scheme_sel;
         input [3:0] op;
         begin
             if (!scheme_sel && (op == OP_PWM)) begin
                 // BRAM read + SBU0 + cascade register + SBU1 + write-back.
-                op_drain_cycles = 5'd18;
+                op_drain_cycles = DRAIN_CHAIN;
             end else begin
-                op_drain_cycles = 5'd9;
+                op_drain_cycles = DRAIN_SINGLE;
             end
         end
     endfunction
@@ -145,7 +148,7 @@ module phoenix_control_unit (
             cur_layer        <= 4'd0;
             last_layer       <= 4'd0;
             drain_ctr        <= 5'd0;
-            drain_cycles     <= 5'd9;
+            drain_cycles     <= DRAIN_SINGLE;
             descending_layers <= 1'b0;
             busy             <= 1'b0;
             done             <= 1'b0;
